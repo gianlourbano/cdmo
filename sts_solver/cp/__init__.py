@@ -1,0 +1,1 @@
+"""Constraint Programming solver for STS using MiniZinc"""
