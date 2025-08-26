@@ -11,6 +11,8 @@ from .ortools_solver import solve_sts_ortools, get_available_ortools_solvers
 from .ortools_optimized import solve_sts_ortools_optimized
 from .ortools_compact import solve_sts_compact, solve_sts_flow_based
 from .ortools_fixed import solve_sts_fixed_compact
+from .ortools_match_based import solve_sts_match_based
+from .ortools_simple_match import solve_sts_simple_match
 
 
 def solve_mip(
@@ -35,6 +37,8 @@ def solve_mip(
         return solve_sts_ortools_optimized(n, actual_solver, timeout, optimization)
     elif formulation == "compact":
         return solve_sts_fixed_compact(n, actual_solver, timeout, optimization)  # Use fixed version
+    elif formulation == "match":
+        return solve_sts_simple_match(n, actual_solver, timeout, optimization)  # Simplified match-based
     elif formulation == "flow":
         return solve_sts_flow_based(n, actual_solver, timeout, optimization)
     elif formulation == "pulp":
