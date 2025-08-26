@@ -1,12 +1,13 @@
 """
-SMT solver for STS using Z3
+SMT solver dispatcher for STS using Z3 with multiple formulations
 """
 
-import time
-from z3 import *
 from typing import Optional
-
 from ..utils.solution_format import STSSolution
+from .z3_baseline import solve_smt as solve_smt_baseline
+from .z3_optimized import solve_smt_optimized
+from .z3_compact import solve_smt_compact
+from .z3_tactics import solve_smt_tactics
 
 
 def solve_smt(
@@ -16,11 +17,11 @@ def solve_smt(
     optimization: bool = False
 ) -> STSSolution:
     """
-    Solve STS using SMT with Z3
+    Solve STS using SMT with Z3 - Multiple formulation options
     
     Args:
         n: Number of teams
-        solver_name: Z3 solver variant (not used for SMT)
+        solver_name: SMT variant (baseline, optimized, compact, tactics, or z3)
         timeout: Timeout in seconds
         optimization: Whether to use optimization version
         
@@ -28,102 +29,21 @@ def solve_smt(
         STSSolution object with results
     """
     
-    weeks = n - 1
-    periods = n // 2
+    # Parse solver name to extract formulation
+    formulation = "baseline"
     
-    start_time = time.time()
+    if solver_name:
+        formulation = solver_name.lower()
+        if formulation == "z3":
+            formulation = "baseline"  # Default Z3 is baseline
     
-    # Create Z3 solver
-    s = Solver()
-    s.set("timeout", timeout * 1000)  # Z3 timeout in milliseconds
-    
-    try:
-        # Decision variables: schedule[w][p][s] = team playing in week w, period p, slot s
-        schedule = {}
-        for w in range(weeks):
-            for p in range(periods):
-                for s in range(2):  # 0=home, 1=away
-                    schedule[w, p, s] = Int(f"schedule_{w}_{p}_{s}")
-                    s.add(schedule[w, p, s] >= 1)
-                    s.add(schedule[w, p, s] <= n)
-        
-        # Constraint 1: No team plays against itself
-        for w in range(weeks):
-            for p in range(periods):
-                s.add(schedule[w, p, 0] != schedule[w, p, 1])
-        
-        # Constraint 2: Every team plays once per week
-        for w in range(weeks):
-            for t in range(1, n + 1):
-                appearances = []
-                for p in range(periods):
-                    for s in range(2):
-                        appearances.append(If(schedule[w, p, s] == t, 1, 0))
-                s.add(Sum(appearances) == 1)
-        
-        # Constraint 3: Every team plays with every other team exactly once
-        for t1 in range(1, n + 1):
-            for t2 in range(t1 + 1, n + 1):
-                games = []
-                for w in range(weeks):
-                    for p in range(periods):
-                        # t1 home vs t2 away
-                        games.append(And(schedule[w, p, 0] == t1, schedule[w, p, 1] == t2))
-                        # t1 away vs t2 home
-                        games.append(And(schedule[w, p, 0] == t2, schedule[w, p, 1] == t1))
-                s.add(Sum([If(game, 1, 0) for game in games]) == 1)
-        
-        # Constraint 4: Each team plays at most twice in the same period
-        for p in range(periods):
-            for t in range(1, n + 1):
-                appearances = []
-                for w in range(weeks):
-                    for s in range(2):
-                        appearances.append(If(schedule[w, p, s] == t, 1, 0))
-                s.add(Sum(appearances) <= 2)
-        
-        # Optional: Symmetry breaking
-        # Fix team 1 to play at home in the first period of the first week
-        s.add(schedule[0, 0, 0] == 1)
-        
-        # Solve
-        if s.check() == sat:
-            model = s.model()
-            elapsed_time = int(time.time() - start_time)
-            
-            # Extract solution
-            sol = []
-            for p in range(periods):
-                period_games = []
-                for w in range(weeks):
-                    home_team = model.eval(schedule[w, p, 0]).as_long()
-                    away_team = model.eval(schedule[w, p, 1]).as_long()
-                    period_games.append([home_team, away_team])
-                sol.append(period_games)
-            
-            return STSSolution(
-                time=elapsed_time,
-                optimal=True,
-                obj=None if not optimization else 1,
-                sol=sol
-            )
-        else:
-            # No solution found
-            return STSSolution(
-                time=timeout,
-                optimal=False,
-                obj=None,
-                sol=[]
-            )
-            
-    except Exception as e:
-        elapsed_time = int(time.time() - start_time)
-        if elapsed_time >= timeout:
-            elapsed_time = timeout
-            
-        return STSSolution(
-            time=elapsed_time,
-            optimal=False,
-            obj=None,
-            sol=[]
-        )
+    # Choose formulation based on solver name
+    if formulation == "optimized":
+        return solve_smt_optimized(n, solver_name, timeout, optimization)
+    elif formulation == "compact":
+        return solve_smt_compact(n, solver_name, timeout, optimization)
+    elif formulation == "tactics":
+        return solve_smt_tactics(n, solver_name, timeout, optimization)
+    else:
+        # Baseline formulation (default)
+        return solve_smt_baseline(n, solver_name, timeout, optimization)

@@ -159,6 +159,10 @@ def list_solvers(solvers: bool):
         for solver in ortools_solvers:
             click.echo(f"  - compact-{solver}")
             
+        click.echo("\nMatch-based formulation (true compact, like SMT):")
+        for solver in ortools_solvers:
+            click.echo(f"  - match-{solver}")
+            
         click.echo("\nFlow-based formulation (network model):")
         for solver in ortools_solvers:
             click.echo(f"  - flow-{solver}")
@@ -221,7 +225,7 @@ def get_solvers_for_approach(approach: str) -> List[str]:
     elif approach == "SAT":
         return ["z3"]
     elif approach == "SMT": 
-        return ["z3"]
+        return ["baseline", "optimized", "compact", "tactics"]
     elif approach == "MIP":
         from .mip.ortools_solver import get_available_ortools_solvers
         ortools_solvers = get_available_ortools_solvers()
@@ -238,6 +242,10 @@ def get_solvers_for_approach(approach: str) -> List[str]:
         # Compact formulations (for scalability)
         for solver in ortools_solvers:
             mip_solvers.append(f"compact-{solver}")
+            
+        # Match-based formulations (true compact like SMT)
+        for solver in ortools_solvers:
+            mip_solvers.append(f"match-{solver}")
             
         return mip_solvers
     else:
