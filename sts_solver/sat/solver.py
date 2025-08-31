@@ -36,9 +36,9 @@ def solve_sat(
     
     if solver_name and "-" in solver_name:
         parts = solver_name.split("-", 1)
-        formulation = parts[0].lower()
-        actual_solver = parts[1].upper()
-        
+        actual_solver = parts[0].lower()
+        formulation = parts[1].lower()
+    
     if formulation == "pairwise":
         return solve_sat_pairwise(n, actual_solver, timeout, optimization)
     else:
