@@ -4,11 +4,14 @@ SMT solver dispatcher for STS using Z3 with multiple formulations
 
 from typing import Optional
 from ..utils.solution_format import STSSolution
-from .z3_baseline import solve_smt as solve_smt_baseline
-from .z3_optimized import solve_smt_optimized
-from .z3_compact import solve_smt_compact
-from .z3_tactics import solve_smt_tactics
+from .registry import get_all_solvers, get_registered_solvers
 
+# Import solver modules (decorators will auto-register)
+from . import z3_baseline
+from . import z3_optimized  
+from . import z3_compact
+from . import z3_with_presolve
+from . import cvc5_presolve
 
 def solve_smt(
     n: int, 
@@ -21,7 +24,7 @@ def solve_smt(
     
     Args:
         n: Number of teams
-        solver_name: SMT variant (baseline, optimized, compact, tactics, or z3)
+        solver_name: SMT variant (baseline, optimized, compact, tactics, presolve, or z3)
         timeout: Timeout in seconds
         optimization: Whether to use optimization version
         
@@ -37,13 +40,10 @@ def solve_smt(
         if formulation == "z3":
             formulation = "baseline"  # Default Z3 is baseline
     
-    # Choose formulation based on solver name
-    if formulation == "optimized":
-        return solve_smt_optimized(n, solver_name, timeout, optimization)
-    elif formulation == "compact":
-        return solve_smt_compact(n, solver_name, timeout, optimization)
-    elif formulation == "tactics":
-        return solve_smt_tactics(n, solver_name, timeout, optimization)
+    # Use registry to find and call the appropriate solver
+    solvers = get_all_solvers()
+    if formulation in solvers:
+        return solvers[formulation](n, solver_name, timeout, optimization)
     else:
-        # Baseline formulation (default)
-        return solve_smt_baseline(n, solver_name, timeout, optimization)
+        # Fallback to baseline if formulation not found
+        return solvers["baseline"](n, solver_name, timeout, optimization)

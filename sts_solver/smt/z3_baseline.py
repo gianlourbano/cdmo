@@ -7,8 +7,10 @@ from z3 import *
 from typing import Optional
 
 from ..utils.solution_format import STSSolution
+from .registry import register_smt_solver
 
 
+@register_smt_solver("baseline")
 def solve_smt(
     n: int, 
     solver_name: Optional[str] = None, 

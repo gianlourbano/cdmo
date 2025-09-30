@@ -7,13 +7,50 @@ import pulp as pl
 from typing import Optional
 
 from ..utils.solution_format import STSSolution
+from .registry import register_mip_solver, get_solver, get_registered_solvers
 from .ortools_solver import solve_sts_ortools, get_available_ortools_solvers
 from .ortools_optimized import solve_sts_ortools_optimized
 from .ortools_compact import solve_sts_compact, solve_sts_flow_based
 from .ortools_fixed import solve_sts_fixed_compact
 from .ortools_match_based import solve_sts_match_based
 from .ortools_simple_match import solve_sts_simple_match
+from .ortools_presolve import presolve_sts
 
+
+@register_mip_solver("standard")
+def solve_mip_standard(n: int, solver_name: Optional[str] = None, timeout: int = 300, optimization: bool = False) -> STSSolution:
+    """Standard OR-Tools formulation"""
+    return solve_sts_ortools(n, solver_name, timeout, optimization)
+
+@register_mip_solver("optimized")
+def solve_mip_optimized(n: int, solver_name: Optional[str] = None, timeout: int = 300, optimization: bool = False) -> STSSolution:
+    """Optimized OR-Tools formulation"""
+    return solve_sts_ortools_optimized(n, solver_name, timeout, optimization)
+
+@register_mip_solver("compact")
+def solve_mip_compact(n: int, solver_name: Optional[str] = None, timeout: int = 300, optimization: bool = False) -> STSSolution:
+    """Fixed compact formulation"""
+    return solve_sts_fixed_compact(n, solver_name, timeout, optimization)
+
+@register_mip_solver("match")
+def solve_mip_match(n: int, solver_name: Optional[str] = None, timeout: int = 300, optimization: bool = False) -> STSSolution:
+    """Match-based formulation"""
+    return solve_sts_simple_match(n, solver_name, timeout, optimization)
+
+@register_mip_solver("flow")
+def solve_mip_flow(n: int, solver_name: Optional[str] = None, timeout: int = 300, optimization: bool = False) -> STSSolution:
+    """Flow-based formulation"""
+    return solve_sts_flow_based(n, solver_name, timeout, optimization)
+
+@register_mip_solver("pulp")
+def solve_mip_pulp_wrapper(n: int, solver_name: Optional[str] = None, timeout: int = 300, optimization: bool = False) -> STSSolution:
+    """PuLP formulation"""
+    return solve_mip_pulp(n, solver_name, timeout, optimization)
+
+@register_mip_solver("presolve")
+def solve_mip_presolve(n: int, solver_name: Optional[str] = None, timeout: int = 300, optimization: bool = False) -> STSSolution:
+    """Presolve formulation"""
+    return presolve_sts(n, solver_name, timeout, optimization)
 
 def solve_mip(
     n: int, 
@@ -32,38 +69,26 @@ def solve_mip(
         formulation = parts[0].lower()
         actual_solver = parts[1].upper()
     
-    # Choose formulation
-    if formulation == "optimized":
-        return solve_sts_ortools_optimized(n, actual_solver, timeout, optimization)
-    elif formulation == "compact":
-        return solve_sts_fixed_compact(n, actual_solver, timeout, optimization)  # Use fixed version
-    elif formulation == "match":
-        return solve_sts_simple_match(n, actual_solver, timeout, optimization)  # Simplified match-based
-    elif formulation == "flow":
-        return solve_sts_flow_based(n, actual_solver, timeout, optimization)
-    elif formulation == "pulp":
-        return solve_mip_pulp(n, actual_solver.lower(), timeout, optimization)
-    else:
-        # Standard formulation
-        ortools_solvers = ["CBC", "SCIP", "GUROBI", "CPLEX"]
-        if actual_solver and actual_solver.upper() in ortools_solvers:
-            return solve_sts_ortools(n, actual_solver, timeout, optimization)
-        
-        # Use OR-Tools by default
-        if solver_name is None:
-            available_ortools = get_available_ortools_solvers()
-            if available_ortools:
-                # Use optimized formulation for larger instances
-                if n >= 12:
-                    preferred_solver = "SCIP" if "SCIP" in available_ortools else available_ortools[0]
-                    return solve_sts_ortools_optimized(n, preferred_solver, timeout, optimization)
-                else:
-                    # Standard formulation for smaller instances
-                    preferred_solver = "SCIP" if "SCIP" in available_ortools else available_ortools[0]
-                    return solve_sts_ortools(n, preferred_solver, timeout, optimization)
-        
-        # Fallback to PuLP
-        return solve_mip_pulp(n, solver_name, timeout, optimization)
+    # Use registry to get solver function
+    solver_func = get_solver(formulation)
+    if solver_func:
+        return solver_func(n, actual_solver, timeout, optimization)
+    
+    # Fallback logic for unregistered solvers
+    if solver_name is None:
+        available_ortools = get_available_ortools_solvers()
+        if available_ortools:
+            # Use optimized formulation for larger instances
+            if n >= 12:
+                preferred_solver = "SCIP" if "SCIP" in available_ortools else available_ortools[0]
+                return solve_sts_ortools_optimized(n, preferred_solver, timeout, optimization)
+            else:
+                # Standard formulation for smaller instances
+                preferred_solver = "SCIP" if "SCIP" in available_ortools else available_ortools[0]
+                return solve_sts_ortools(n, preferred_solver, timeout, optimization)
+    
+    # Fallback to PuLP
+    return solve_mip_pulp(n, solver_name, timeout, optimization)
 
 
 def solve_mip_pulp(

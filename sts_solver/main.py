@@ -173,12 +173,6 @@ def list_solvers(solvers: bool):
         click.echo("\n=== Other Approaches ===")
         click.echo("CP solvers: gecode, chuffed")
         click.echo("SAT/SMT solvers: z3")
-        
-        click.echo("\n=== Recommendations ===")
-        click.echo("For n <= 10: Use standard formulation")
-        click.echo("For n >= 12: Use optimized or compact formulation")
-        click.echo("For n >= 16: Try compact or flow formulation")
-
 
 @cli.command()
 @click.argument("max_n", type=int)
