@@ -8,12 +8,12 @@ from ..utils.solution_format import STSSolution
 from .solver import (
     solve_mip_standard,
     solve_mip_optimized,
-    solve_mip_compact,
     solve_mip_match,
     solve_mip_flow,
     solve_mip_pulp,
     solve_mip_presolve,
 )
+from .compact import MIPCompactNativeSolver
 
 
 class _DelegatingMIPSolver(MIPBaseSolver):
@@ -57,11 +57,8 @@ class MIPOptimizedSolver(_DelegatingMIPSolver):
 
 
 @registry.register("MIP", "compact")
-class MIPCompactSolver(_DelegatingMIPSolver):
-    _delegate = staticmethod(solve_mip_compact)
-    _name = "compact"
-    _supports_opt = False
-    _max_n = 16
+class MIPCompactSolver(MIPCompactNativeSolver):
+    pass
 
 
 @registry.register("MIP", "match")
