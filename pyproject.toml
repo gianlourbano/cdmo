@@ -47,3 +47,4 @@ disallow_untyped_defs = true
 
 [project.scripts]
 sts-solve = "sts_solver.main:cli"
+sts2 = "sts_solver.cli.main:cli"
