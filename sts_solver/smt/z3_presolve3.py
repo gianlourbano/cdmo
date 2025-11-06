@@ -173,13 +173,13 @@ def solve_model(matches_per_week, periods, timeout=300):
         for k, (i, j) in enumerate(sorted(matches_per_week[w1])):
             solver.add(p[(w1, i, j)] == k + 1)
 
-        # One match per slot per week
+        # One match per slot per week (from MiniZinc constraint line 41)
         for w in weeks:
             for k in range(1, periods + 1):
                 guards = [(p[(w, i, j)] == k, 1) for (i, j) in matches_per_week[w]]
                 solver.add(PbEq(guards, 1))
 
-        # At most max games per team per slot
+        # At most max games per team per slot (from MiniZinc constraint line 25)
         teams = {t for w in weeks for (i, j) in matches_per_week[w] for t in (i, j)}
         for t in teams:
             for k in range(1, periods + 1):
@@ -188,7 +188,102 @@ def solve_model(matches_per_week, periods, timeout=300):
                         for (i, j) in matches_per_week[w]
                         if t in (i, j)]
                 solver.add(PbLe(guards, 2))
-        
+
+        # MiniZinc constraint: exactly 2 teams play once in each period (lines 82-84)
+        if periods * 2 >= 22:
+            for k in range(1, periods + 1):
+                # Use pseudo-boolean constraints for efficiency
+                deficient_guards = []
+                for t in teams:
+                    # count how many games team t plays in period k
+                    games_count = 0
+                    period_guards = []
+                    for w in weeks:
+                        for (i, j) in matches_per_week[w]:
+                            if t in (i, j):
+                                period_guards.append((p[(w, i, j)] == k, 1))
+                                games_count += 1
+
+                    if period_guards:
+                        # team t is deficient if it plays exactly once in period k
+                        if games_count == 1:
+                            # If team only plays once total, it's always deficient in this period
+                            deficient_guards.append((True, 1))
+                        else:
+                            # Create auxiliary boolean variable for deficiency
+                            deficient_var = Bool(f"deficient_{t}_{k}")
+                            # Constraint: deficient_var is true iff team plays exactly once
+                            # Use reification with pseudo-boolean for efficiency
+                            solver.add(deficient_var == (PbEq(period_guards, 1)))
+                            deficient_guards.append((deficient_var, 1))
+
+                # exactly 2 teams are deficient (play once) in each period
+                if deficient_guards:
+                    solver.add(PbEq(deficient_guards, 2))
+
+        # MiniZinc constraint: exactly n_teams-2 teams play twice in each period (lines 87-89)
+        if periods * 2 >= 22:
+            for k in range(1, periods + 1):
+                # Use pseudo-boolean constraints for efficiency
+                double_guards = []
+                for t in teams:
+                    # count how many games team t plays in period k
+                    games_count = 0
+                    period_guards = []
+                    for w in weeks:
+                        for (i, j) in matches_per_week[w]:
+                            if t in (i, j):
+                                period_guards.append((p[(w, i, j)] == k, 1))
+                                games_count += 1
+
+                    if period_guards:
+                        # team t plays twice if sum of guards == 2
+                        if games_count == 2:
+                            # If team plays exactly twice total, it always plays twice in this period
+                            double_guards.append((True, 1))
+                        else:
+                            # Create auxiliary boolean variable for playing twice
+                            double_var = Bool(f"double_{t}_{k}")
+                            # Constraint: double_var is true iff team plays exactly twice
+                            # Use reification with pseudo-boolean for efficiency
+                            solver.add(double_var == (PbEq(period_guards, 2)))
+                            double_guards.append((double_var, 1))
+
+                # exactly n_teams-2 teams play twice in each period
+                if double_guards:
+                    solver.add(PbEq(double_guards, len(teams) - 2))
+
+        # MiniZinc constraint: Every team is deficient in at most one period (lines 131-133)
+        if periods * 2 >= 22:
+            for t in teams:
+                # Use pseudo-boolean constraints for efficiency
+                deficiency_guards = []
+                for k in range(1, periods + 1):
+                    # count how many games team t plays in period k
+                    games_count = 0
+                    period_guards = []
+                    for w in weeks:
+                        for (i, j) in matches_per_week[w]:
+                            if t in (i, j):
+                                period_guards.append((p[(w, i, j)] == k, 1))
+                                games_count += 1
+
+                    if period_guards:
+                        # team t is deficient in period k if it plays exactly once
+                        if games_count == 1:
+                            # If team only plays once total, it's always deficient
+                            deficiency_guards.append((True, 1))
+                        else:
+                            # Create auxiliary boolean variable for deficiency in this period
+                            deficient_var = Bool(f"def_period_{t}_{k}")
+                            # Constraint: deficient_var is true iff team plays exactly once in period k
+                            # Use reification with pseudo-boolean for efficiency
+                            solver.add(deficient_var == (PbEq(period_guards, 1)))
+                            deficiency_guards.append((deficient_var, 1))
+
+                # each team is deficient in at most one period
+                if deficiency_guards:
+                    solver.add(PbLe(deficiency_guards, 1))
 
         solver.check()
         m = solver.model()
@@ -208,7 +303,7 @@ def solve_model(matches_per_week, periods, timeout=300):
     except Exception as e:
         return None
 
-@register_smt_solver("presolve")
+@register_smt_solver("presolve_3")
 def solve_smt_compact_with_presolve(
     n: int, 
     solver_name: Optional[str] = None, 
@@ -228,8 +323,8 @@ def solve_smt_compact_with_presolve(
     start_time = time.time()
     
     # Presolve: Generate complete schedule with home/away assignments
-    raw_matches = schedule_iterative_divide_and_conquer(n)
-    balanced_matches = home_away_balance(raw_matches, n)
+    balanced_matches = circle_matchings(n)
+    #balanced_matches = home_away_balance(raw_matches, n)
     periods = n // 2
 
     presolve_time = time.time() - start_time

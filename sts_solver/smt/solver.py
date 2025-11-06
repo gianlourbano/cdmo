@@ -12,6 +12,9 @@ from . import z3_optimized
 from . import z3_compact
 from . import z3_with_presolve
 from . import cvc5_presolve
+from . import z3_presolve_new_constraint
+from . import z3_presolve3
+from . import z3_presolve_with_symmetry
 
 def solve_smt(
     n: int, 

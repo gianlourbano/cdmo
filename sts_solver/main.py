@@ -205,8 +205,8 @@ def benchmark(max_n: int, approach: str, solver: Optional[str], timeout: int, al
                 click.echo(f"\nTesting {approach} with default solver...")
                 
             try:
-                ctx = click.Context(solve)
-                ctx.invoke(solve, n=n, approach=approach, solver=test_solver, timeout=timeout, name=test_solver)
+                # Direct function call instead of ctx.invoke to avoid multiprocessing issues in Docker
+                solve.callback(n=n, approach=approach, solver=test_solver, timeout=timeout, name=test_solver, output=None, optimization=False)
             except Exception as e:
                 click.echo(f"Error with {test_solver or 'default'}: {e}", err=True)
 
@@ -285,13 +285,13 @@ def comprehensive_benchmark(max_n: int, timeout: int, approaches: Optional[str])
                 
                 try:
                     start_time = time.time()
-                    ctx = click.Context(solve)
-                    ctx.invoke(solve, n=n, approach=approach, solver=solver, 
-                             timeout=timeout, name=solver, output=None)
+                    # Direct function call instead of ctx.invoke to avoid multiprocessing issues in Docker
+                    solve.callback(n=n, approach=approach, solver=solver,
+                             timeout=timeout, name=solver, output=None, optimization=False)
                     elapsed = time.time() - start_time
                     completed_experiments += 1
                     click.echo(f" OK ({elapsed:.1f}s)")
-                    
+
                 except Exception as e:
                     click.echo(f" Error: {str(e)[:50]}...")
     
