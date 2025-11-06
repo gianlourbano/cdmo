@@ -1,6 +1,8 @@
 from sts_solver.registry import registry
 import sts_solver.mip.unified_bridge  # ensure registration
 import sts_solver.smt.unified_bridge  # ensure registration
+import sts_solver.cp.unified_bridge   # ensure registration
+import sts_solver.sat.unified_bridge  # ensure registration
 
 def main():
     print("Registered solvers:", registry.list_solvers())

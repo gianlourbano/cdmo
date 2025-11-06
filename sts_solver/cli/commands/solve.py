@@ -33,6 +33,8 @@ def solve(
     # Ensure registration side-effects for approaches we support now
     import sts_solver.mip.unified_bridge  # noqa: F401
     import sts_solver.smt.unified_bridge  # noqa: F401
+    import sts_solver.cp.unified_bridge   # noqa: F401
+    import sts_solver.sat.unified_bridge  # noqa: F401
 
     try:
         validate_instance_size(n)

@@ -12,6 +12,8 @@ def list_solvers(solvers: bool):
     # Ensure registrations
     import sts_solver.mip.unified_bridge  # noqa: F401
     import sts_solver.smt.unified_bridge  # noqa: F401
+    import sts_solver.cp.unified_bridge   # noqa: F401
+    import sts_solver.sat.unified_bridge  # noqa: F401
 
     if not solvers:
         click.echo("Pass --solvers to list registered solvers")
