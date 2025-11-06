@@ -4,6 +4,7 @@
 - Phase 1 (Foundation): Completed (base classes, exceptions, unified registry)
 - Phase 2 (CLI): Completed (modular CLI, new `sts` entrypoint)
 - Phase 3 (Unification): Bridges added for CP/SAT/SMT/MIP; base classes for MIP/SMT created. Deep internal refactors pending.
+    - Converted MIP 'compact' and 'optimized' to class-based implementations using `MIPBaseSolver`.
 - Phase 4 (Config & Errors): Completed (config system, error handling utilities, CLI integration, README updated)
 - Phase 5 (Tests & Docs): Pending
 

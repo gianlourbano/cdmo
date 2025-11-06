@@ -6,7 +6,6 @@ from ..base_solver import SolverMetadata
 from ..registry import registry
 from ..utils.solution_format import STSSolution
 from .solver import (
-    solve_mip_standard,
     solve_mip_match,
     solve_mip_flow,
     solve_mip_pulp,
@@ -14,6 +13,7 @@ from .solver import (
 )
 from .compact import MIPCompactNativeSolver
 from .optimized import MIPOptimizedNativeSolver
+from .standard import MIPStandardNativeSolver
 
 
 class _DelegatingMIPSolver(MIPBaseSolver):
@@ -43,10 +43,8 @@ class _DelegatingMIPSolver(MIPBaseSolver):
 
 
 @registry.register("MIP", "standard")
-class MIPStandardSolver(_DelegatingMIPSolver):
-    _delegate = staticmethod(solve_mip_standard)
-    _name = "standard"
-    _supports_opt = True
+class MIPStandardSolver(MIPStandardNativeSolver):
+    pass
 
 
 @registry.register("MIP", "optimized")
