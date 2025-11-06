@@ -5,6 +5,7 @@ from typing import Optional, List
 import click
 
 from ..utils import get_solvers_for_approach
+from ...config import get_config
 from .solve import solve as solve_command
 
 
@@ -12,10 +13,13 @@ from .solve import solve as solve_command
 @click.argument("max_n", type=int)
 @click.option("--approach", "-a", type=click.Choice(["CP", "SAT", "SMT", "MIP"]), default="CP")
 @click.option("--solver", "-s", help="Specific solver to use")
-@click.option("--timeout", "-t", default=300, help="Timeout in seconds")
+@click.option("--timeout", "-t", type=int, default=None, help="Timeout in seconds (defaults from config)")
 @click.option("--all-solvers", is_flag=True, help="Run all available solvers for the approach")
-def benchmark(max_n: int, approach: str, solver: Optional[str], timeout: int, all_solvers: bool):
+def benchmark(max_n: int, approach: str, solver: Optional[str], timeout: Optional[int], all_solvers: bool):
     """Run benchmark for instances from 4 to MAX_N teams."""
+
+    cfg = get_config()
+    effective_timeout = timeout if timeout is not None else cfg.benchmark_timeout
 
     if all_solvers:
         click.echo(f"Running comprehensive benchmark for {approach} approach up to {max_n} teams")
@@ -44,7 +48,7 @@ def benchmark(max_n: int, approach: str, solver: Optional[str], timeout: int, al
                 cb = getattr(solve_command, 'callback', None)
                 if cb is None:
                     raise RuntimeError('solve callback not available')
-                cb(n=n, approach=approach, solver=test_solver, timeout=timeout, output=None, optimization=False, name=test_solver)
+                cb(n=n, approach=approach, solver=test_solver, timeout=effective_timeout, output=None, optimization=False, name=test_solver)
                 elapsed = time.time() - start_time
                 click.echo(f"OK ({elapsed:.1f}s)")
             except Exception as e:
@@ -53,11 +57,13 @@ def benchmark(max_n: int, approach: str, solver: Optional[str], timeout: int, al
 
 @click.command(name="comprehensive-benchmark")
 @click.argument("max_n", type=int)
-@click.option("--timeout", "-t", default=300, help="Timeout in seconds")
+@click.option("--timeout", "-t", type=int, default=None, help="Timeout in seconds (defaults from config)")
 @click.option("--approaches", help="Comma-separated list of approaches (CP,SAT,SMT,MIP)")
-def comprehensive_benchmark(max_n: int, timeout: int, approaches: Optional[str]):
+def comprehensive_benchmark(max_n: int, timeout: Optional[int], approaches: Optional[str]):
     """Run comprehensive benchmark across ALL approaches and solvers."""
 
+    cfg = get_config()
+    effective_timeout = timeout if timeout is not None else cfg.benchmark_timeout
     if approaches:
         approach_list = [a.strip().upper() for a in approaches.split(",")]
     else:
@@ -68,7 +74,7 @@ def comprehensive_benchmark(max_n: int, timeout: int, approaches: Optional[str])
     click.echo("="*60)
     click.echo(f"Approaches: {', '.join(approach_list)}")
     click.echo(f"Instance range: 4 to {max_n} teams")
-    click.echo(f"Timeout: {timeout} seconds per solver")
+    click.echo(f"Timeout: {effective_timeout} seconds per solver")
     click.echo("="*60)
 
     total_experiments = 0
@@ -93,7 +99,7 @@ def comprehensive_benchmark(max_n: int, timeout: int, approaches: Optional[str])
                     cb = getattr(solve_command, 'callback', None)
                     if cb is None:
                         raise RuntimeError('solve callback not available')
-                    cb(n=n, approach=approach, solver=solver, timeout=timeout, output=None, optimization=False, name=solver)
+                    cb(n=n, approach=approach, solver=solver, timeout=effective_timeout, output=None, optimization=False, name=solver)
                     elapsed = time.time() - start_time
                     completed_experiments += 1
                     click.echo(f" OK ({elapsed:.1f}s)")

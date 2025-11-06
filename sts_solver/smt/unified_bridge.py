@@ -1,7 +1,8 @@
 """Wrapper classes to expose current SMT implementations via the unified registry."""
 from typing import Any, Optional, Callable
 
-from ..base_solver import BaseSolver, SolverMetadata
+from .base import SMTBaseSolver
+from ..base_solver import SolverMetadata
 from ..registry import registry
 from ..utils.solution_format import STSSolution
 
@@ -10,7 +11,7 @@ from . import solver as _smt_loader  # noqa: F401
 from .registry import get_solver as _get_smt_solver
 
 
-class _DelegatingSMTSolver(BaseSolver):
+class _DelegatingSMTSolver(SMTBaseSolver):
     _formulation: str = "baseline"
 
     def _build_model(self) -> Any:

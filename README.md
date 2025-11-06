@@ -66,38 +66,38 @@ uv sync
 
 ## Usage
 
-### Command Line Interface
+### Command Line Interface (new `sts` CLI)
 
 Solve a single instance:
 ```bash
 # Constraint Programming
-uv run sts-solve solve 6 CP --solver gecode --timeout 300
+uv run sts solve 6 CP --solver gecode --timeout 300
 
 # MIP with different formulations
-uv run sts-solve solve 8 MIP --solver SCIP --timeout 300
-uv run sts-solve solve 12 MIP --solver optimized-SCIP --timeout 300
-uv run sts-solve solve 14 MIP --solver compact-CBC --timeout 300
-uv run sts-solve solve 16 MIP --solver flow-SCIP --timeout 300
+uv run sts solve 8 MIP --solver SCIP --timeout 300
+uv run sts solve 12 MIP --solver optimized-SCIP --timeout 300
+uv run sts solve 14 MIP --solver compact-CBC --timeout 300
+uv run sts solve 16 MIP --solver flow-SCIP --timeout 300
 ```
 
 List available solvers and formulations:
 ```bash
-uv run sts-solve list-solvers --solvers
+uv run sts list-solvers --solvers
 ```
 
 Run benchmark:
 ```bash
 # Single approach with specific solver
-uv run sts-solve benchmark 12 --approach CP --timeout 300
+uv run sts benchmark 12 --approach CP --timeout 300
 
 # Single approach with all available solvers
-uv run sts-solve benchmark 16 --approach MIP --all-solvers
+uv run sts benchmark 16 --approach MIP --all-solvers
 
 # Comprehensive benchmark (ALL approaches and solvers)
-uv run sts-solve comprehensive-benchmark 14 --timeout 300
+uv run sts comprehensive-benchmark 14 --timeout 300
 
 # Comprehensive benchmark for specific approaches
-uv run sts-solve comprehensive-benchmark 12 --approaches "CP,MIP"
+uv run sts comprehensive-benchmark 12 --approaches "CP,MIP"
 ```
 
 ## **Post-Benchmark Analysis**
@@ -106,17 +106,17 @@ Comprehensive analysis and validation tools:
 
 ```bash
 # Analyze all results with comprehensive statistics
-uv run sts-solve analyze
+uv run sts analyze
 
 # Validate all solutions and show errors
-uv run sts-solve validate-results
+uv run sts validate-results
 
 # Export analysis to different formats
-uv run sts-solve analyze --format json  # For programmatic use
-uv run sts-solve analyze --format csv   # For spreadsheets
+uv run sts analyze --format json  # For programmatic use
+uv run sts analyze --format csv   # For spreadsheets
 
 # Compare solvers on specific instance
-uv run sts-solve compare-instance 14
+uv run sts compare-instance 14
 ```
 
 **Analysis Features:**
@@ -135,12 +135,12 @@ uv run sts-solve compare-instance 14
 
 Validate solution file:
 ```bash
-uv run sts-solve validate res/CP/6.json
+uv run sts validate res/CP/6.json
 ```
 
 Validate all results with official checker:
 ```bash
-uv run sts-solve validate-all --official
+uv run sts validate-all --official
 ```
 
 ### Docker Usage
@@ -154,10 +154,52 @@ For complete automated experiments (as required by project):
 For individual commands:
 ```bash
 # Solve instance with 6 teams using CP approach
-docker run --rm -v $(pwd)/res:/app/res sts-solver uv run sts-solve solve 6 CP
+docker run --rm -v $(pwd)/res:/app/res sts-solver uv run sts solve 6 CP
 
 # Run full benchmark
-docker run --rm -v $(pwd)/res:/app/res sts-solver uv run sts-solve benchmark 20
+docker run --rm -v $(pwd)/res:/app/res sts-solver uv run sts benchmark 20
+
+### Unified Registry
+
+The CLI is backed by a unified registry that lists and instantiates solvers across all approaches (CP, SAT, SMT, MIP). Use:
+
+```bash
+uv run sts list-solvers --solvers
+```
+
+to discover registered solver names and descriptions. The `solve` command accepts these names via `--solver` and falls back to a recommended default when omitted.
+
+### Notes on Migration
+
+- The old entrypoints (`sts-solve`, `sts2`) are replaced by `sts`.
+- The legacy monolithic CLI module remains for reference but is not exposed as an entrypoint.
+
+### Configuration
+
+The CLI uses a lightweight configuration system with sensible defaults:
+
+- Default results directory: `res/`
+- Default timeout: `300s`
+- Benchmark timeout: `300s`
+
+You can customize via:
+
+- File: `sts_config.json` (project root) or `~/.sts_config.json`
+  Example:
+  ```json
+  {
+    "results_dir": "res",
+    "default_timeout": 300,
+    "benchmark_timeout": 300,
+    "log_level": "INFO"
+  }
+  ```
+- Environment variables:
+  - `STS_RESULTS_DIR` (e.g., `/tmp/res`)
+  - `STS_DEFAULT_TIMEOUT` (e.g., `600`)
+  - `STS_LOG_LEVEL` (e.g., `DEBUG`)
+
+CLI options still override config values when provided.
 ```
 
 ### Automated Execution

@@ -1,5 +1,12 @@
 # CDMO Project Refactoring Plan
 
+> Progress Update (2025-11-06):
+- Phase 1 (Foundation): Completed (base classes, exceptions, unified registry)
+- Phase 2 (CLI): Completed (modular CLI, new `sts` entrypoint)
+- Phase 3 (Unification): Bridges added for CP/SAT/SMT/MIP; base classes for MIP/SMT created. Deep internal refactors pending.
+- Phase 4 (Config & Errors): Completed (config system, error handling utilities, CLI integration, README updated)
+- Phase 5 (Tests & Docs): Pending
+
 ## Executive Summary
 
 This document outlines a comprehensive refactoring plan for the Sports Tournament Scheduling (STS) solver project. The refactoring aims to improve code maintainability, reduce duplication, enhance testability, and establish consistent patterns across all solver implementations.

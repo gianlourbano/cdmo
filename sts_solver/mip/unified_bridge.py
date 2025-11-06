@@ -1,7 +1,8 @@
 """Wrapper classes to expose current MIP implementations via the unified registry."""
 from typing import Any, Optional, Callable
 
-from ..base_solver import BaseSolver, SolverMetadata
+from .base import MIPBaseSolver
+from ..base_solver import SolverMetadata
 from ..registry import registry
 from ..utils.solution_format import STSSolution
 from .solver import (
@@ -15,7 +16,7 @@ from .solver import (
 )
 
 
-class _DelegatingMIPSolver(BaseSolver):
+class _DelegatingMIPSolver(MIPBaseSolver):
     _delegate: Optional[Callable[[int, Optional[str], int, bool], STSSolution]] = None
     _name = "mip-delegate"
     _supports_opt = False

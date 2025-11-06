@@ -40,13 +40,15 @@ def validate(results_file: str, checker: Optional[str]):
 
 @click.command(name="validate-all")
 @click.option("--checker", "-c", type=click.Path(), help="Path to solution_checker.py")
-@click.option("--results-dir", "-r", type=click.Path(), default="res", help="Results directory")
+@click.option("--results-dir", "-r", type=click.Path(), default=None, help="Results directory (defaults from config)")
 @click.option("--official", is_flag=True, help="Use official checker's directory-based validation")
 def validate_all(checker: Optional[str], results_dir: str, official: bool):
     """Validate all solution files in a directory."""
 
+    from ...config import get_config
+    cfg = get_config()
     checker_path = Path(checker) if checker else Path("solution_checker.py")
-    results_path = Path(results_dir)
+    results_path = Path(results_dir) if results_dir else cfg.results_dir
 
     if official:
         from ...utils.checker import validate_directory_with_official_checker
@@ -60,11 +62,13 @@ def validate_all(checker: Optional[str], results_dir: str, official: bool):
 
 
 @click.command(name="validate-results")
-@click.option("--results-dir", "-r", type=click.Path(), default="res", help="Results directory")
+@click.option("--results-dir", "-r", type=click.Path(), default=None, help="Results directory (defaults from config)")
 def validate_results(results_dir: str):
     """Validate all benchmark results and show detailed error report."""
 
     from ...utils.analytics import validate_and_report_errors
+    from ...config import get_config
 
-    results_path = Path(results_dir)
+    cfg = get_config()
+    results_path = Path(results_dir) if results_dir else cfg.results_dir
     validate_and_report_errors(results_path)
