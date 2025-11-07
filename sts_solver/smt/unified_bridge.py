@@ -9,6 +9,7 @@ from ..utils.solution_format import STSSolution
 # Ensure SMT solvers are registered in their own registry via import side effects
 from . import solver as _smt_loader  # noqa: F401
 from .registry import get_solver as _get_smt_solver
+from .baseline_class import SMTBaselineNativeSolver
 
 
 class _DelegatingSMTSolver(SMTBaseSolver):
@@ -35,8 +36,8 @@ class _DelegatingSMTSolver(SMTBaseSolver):
 
 
 @registry.register("SMT", "baseline")
-class SMTBaselineSolver(_DelegatingSMTSolver):
-    _formulation = "baseline"
+class SMTBaselineSolver(SMTBaselineNativeSolver):
+    pass
 
 
 @registry.register("SMT", "optimized")
