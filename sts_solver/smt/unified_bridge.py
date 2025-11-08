@@ -12,6 +12,11 @@ from .registry import get_solver as _get_smt_solver
 from .baseline_class import SMTBaselineNativeSolver
 from .optimized_class import SMTOptimizedNativeSolver
 from .compact_class import SMTCompactNativeSolver
+from .presolve_class import SMTPresolveNativeSolver
+from .presolve2_class import SMTPresolve2NativeSolver
+from .presolve3_class import SMTPresolve3NativeSolver
+from .presolve_symmetry_class import SMTPresolveSymmetryNativeSolver
+from .presolve_cvc5_class import SMTPresolveCVC5NativeSolver
 
 
 class _DelegatingSMTSolver(SMTBaseSolver):
@@ -53,25 +58,25 @@ class SMTCompactSolver(SMTCompactNativeSolver):
 
 
 @registry.register("SMT", "presolve")
-class SMTPresolveSolver(_DelegatingSMTSolver):
-    _formulation = "presolve"
+class SMTPresolveSolver(SMTPresolveNativeSolver):
+    pass
 
 
 @registry.register("SMT", "presolve_cvc5")
-class SMTPresolveCVC5Solver(_DelegatingSMTSolver):
-    _formulation = "presolve_cvc5"
+class SMTPresolveCVC5Solver(SMTPresolveCVC5NativeSolver):
+    pass
 
 
 @registry.register("SMT", "presolve_2")
-class SMTPresolve2Solver(_DelegatingSMTSolver):
-    _formulation = "presolve_2"
+class SMTPresolve2Solver(SMTPresolve2NativeSolver):
+    pass
 
 
 @registry.register("SMT", "presolve_3")
-class SMTPresolve3Solver(_DelegatingSMTSolver):
-    _formulation = "presolve_3"
+class SMTPresolve3Solver(SMTPresolve3NativeSolver):
+    pass
 
 
 @registry.register("SMT", "presolve_symmetry")
-class SMTPresolveSymmetrySolver(_DelegatingSMTSolver):
-    _formulation = "presolve_symmetry"
+class SMTPresolveSymmetrySolver(SMTPresolveSymmetryNativeSolver):
+    pass
