@@ -1,10 +1,11 @@
 # CDMO Project Refactoring Plan
 
-> Progress Update (2025-11-06):
+> Progress Update (2025-11-08):
 - Phase 1 (Foundation): Completed (base classes, exceptions, unified registry)
 - Phase 2 (CLI): Completed (modular CLI, new `sts` entrypoint)
-- Phase 3 (Unification): Bridges added for CP/SAT/SMT/MIP; base classes for MIP/SMT created. Deep internal refactors pending.
-    - Converted MIP 'standard', 'compact', and 'optimized' to class-based implementations using `MIPBaseSolver`.
+- Phase 3 (Unification): Bridges added for CP/SAT/SMT/MIP; base classes for MIP/SMT created. Internal refactors progressing.
+    - MIP: 'standard', 'compact', and 'optimized' migrated to class-based implementations using `MIPBaseSolver`.
+    - SMT: 'baseline', 'optimized', and 'compact' migrated to class-based implementations using `SMTBaseSolver`. Presolve family still delegated (`presolve`, `presolve_2`, `presolve_3`, `presolve_cvc5`, `presolve_symmetry`).
 - Phase 4 (Config & Errors): Completed (config system, error handling utilities, CLI integration, README updated)
 - Phase 5 (Tests & Docs): Pending
 
@@ -85,7 +86,7 @@ cdmo-project/
 
 ### Phase 3: Solver Unification (Priority: MEDIUM)
 **Goal:** Standardize solver implementations
-**Duration:** 1-2 days
+**Duration:** Ongoing (incremental migration of remaining delegates)
 
 ### Phase 4: Configuration & Error Handling (Priority: MEDIUM)
 **Goal:** Centralize configuration and improve error handling
@@ -814,24 +815,24 @@ class SMTBaseSolver(BaseSolver):
         pass
 ```
 
-### 3.3 Solver Migration Checklist
+### 3.3 Solver Migration Checklist (Updated)
 
 For each solver implementation:
 
-- [ ] Inherit from appropriate base class
-- [ ] Implement required abstract methods
-- [ ] Register with unified registry
-- [ ] Add metadata with `get_metadata()`
-- [ ] Remove duplicated code
-- [ ] Add docstrings
-- [ ] Add type hints
-- [ ] Write unit tests
+✔ Inherit from appropriate base class
+✔ Implement required abstract methods
+✔ Register with unified registry
+✔ Add metadata with `get_metadata()`
+✔ Remove duplicated code (MIP standard/compact/optimized; SMT baseline/optimized/compact)
+✔ Add docstrings (new class-based solvers)
+✔ Add type hints (new class-based solvers)
+⏳ Write unit tests (scheduled Phase 5)
 
-**Priority Order:**
-1. MIP solvers (most duplication)
-2. SMT solvers (7 implementations)
-3. SAT solvers
-4. CP solvers
+**Priority Order (Updated):**
+1. Complete SMT presolve family migration
+2. Remaining MIP delegates (match, flow, pulp, presolve)
+3. SAT function-based solvers → class-based
+4. CP function-based solvers → class-based
 
 ---
 
@@ -1173,9 +1174,14 @@ def function_name(param1: Type1, param2: Type2) -> ReturnType:
 - [ ] Update imports throughout project
 - [ ] Test all CLI commands
 
-### Week 2: Solver Unification
+### Week 2+: Solver Unification (Rolling)
 
-**Day 4-5: MIP Refactoring**
+**Completed:** MIP (standard, compact, optimized); SMT (baseline, optimized, compact)
+
+**Next Sprint Focus:**
+1. SMT presolve variants → class-based
+2. Benchmark parity checks post-migration
+3. Start SAT migration scaffolding
 - [ ] Create `MIPBaseSolver` base class
 - [ ] Refactor `ortools_solver.py` to use base class
 - [ ] Refactor compact formulations
@@ -1373,6 +1379,6 @@ This refactoring plan provides a systematic approach to improving the CDMO proje
 
 ---
 
-*Last Updated: [Current Date]*
+*Last Updated: 2025-11-08*
 *Author: Refactoring Team*
 *Version: 1.0*

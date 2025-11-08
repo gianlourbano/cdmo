@@ -10,6 +10,8 @@ from ..utils.solution_format import STSSolution
 from . import solver as _smt_loader  # noqa: F401
 from .registry import get_solver as _get_smt_solver
 from .baseline_class import SMTBaselineNativeSolver
+from .optimized_class import SMTOptimizedNativeSolver
+from .compact_class import SMTCompactNativeSolver
 
 
 class _DelegatingSMTSolver(SMTBaseSolver):
@@ -41,13 +43,13 @@ class SMTBaselineSolver(SMTBaselineNativeSolver):
 
 
 @registry.register("SMT", "optimized")
-class SMTOptimizedSolver(_DelegatingSMTSolver):
-    _formulation = "optimized"
+class SMTOptimizedSolver(SMTOptimizedNativeSolver):
+    pass
 
 
 @registry.register("SMT", "compact")
-class SMTCompactSolver(_DelegatingSMTSolver):
-    _formulation = "compact"
+class SMTCompactSolver(SMTCompactNativeSolver):
+    pass
 
 
 @registry.register("SMT", "presolve")
