@@ -15,13 +15,17 @@ array[Teams, Teams] of var bool: home;
 
 %% -- BEGIN main constraints --
 
-% enforce symmetry of the tables
+% Match validity
 constraint forall(i,j in Teams where i!=j)(period[i,j]!=0);
 constraint forall(i in Teams) (period[i,i] == 0);
+
+%Period Simmetry
 constraint forall(i,j in Teams where i<j)(period[i,j] == period[j,i]);
+
+% Home-Away Consistency
 constraint forall(i,j in Teams where i<j) (home[j,i] == 1- home[i,j]);
 
-% Each team plays at most twice in the same period
+% Period Usage Constraint
 constraint forall(t in Teams, p in 1..num_periods)(count_geq([period[t,j] | j in Teams where t != j], p, 2)::domain_propagation);
 
 /*

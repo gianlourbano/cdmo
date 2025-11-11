@@ -13,15 +13,20 @@ set of int: Periods = 0..num_periods;
 array[Teams, Teams] of var Periods: period;
 array[Teams, Teams] of var bool: home;
 
+
 %% -- BEGIN main constraints --
 
-% enforce symmetry of the tables
+% Match validity
 constraint forall(i,j in Teams where i!=j)(period[i,j]!=0);
 constraint forall(i in Teams) (period[i,i] == 0);
+
+%Period Simmetry
 constraint forall(i,j in Teams where i<j)(period[i,j] == period[j,i]);
+
+% Home-Away Consistency
 constraint forall(i,j in Teams where i<j) (home[j,i] == 1- home[i,j]);
 
-% Each team plays at most twice in the same period
+% Period Usage Constraint
 constraint forall(t in Teams, p in 1..num_periods)(count_geq([period[t,j] | j in Teams where t != j], p, 2)::domain_propagation);
 
 /*
@@ -38,7 +43,7 @@ constraint forall(t in Teams)(
 
 */  
 % Consistent fill between week and slot - each week exactly n/2 matches
-constraint forall(w in 1..num_weeks, p in 1..num_periods )(   sum([bool2int(week[i,j] == w /\ period[i,j] == p) | i,j in Teams where i < j]) = 1);
+constraint forall(w in 1..num_weeks, p in 1..num_periods )(sum([bool2int(week[i,j] == w /\ period[i,j] == p) | i,j in Teams where i < j]) = 1);
 /*
 constraint forall(w in 1..num_weeks)(
    alldifferent([ period[i,j] | i,j in Teams where i < j /\ week[i,j] == w ])::domain_propagation);
@@ -70,8 +75,7 @@ array[1..(num_teams div 2)] of var Periods: week1_periods =
 constraint increasing(week1_periods); %work better than strictly increasing
 
 % fix the games team 1 plays at home and those it plays away
-constraint forall(i, j in Teams where i < j) (
-  home[i, j] == 1);
+constraint forall(i, j in Teams where i < j) (home[i, j] == 1);
 % -- END simmetry breaking --
 
 %% -- BEGIN  implicit constraints --
@@ -88,6 +92,8 @@ constraint forall(p in 1..num_periods) (
   sum([bool2int(sum(j in Teams where j!=t)(bool2int(period[t,j] == p)) == 2) | t in Teams]) = num_teams - 2
 );
 
+
+% occ[t,p] = numero di partite che il team t gioca nel periodo p
 /*
 % occ[t,p] = numero di partite che il team t gioca nel periodo p
 % occ[t,p] = numero di partite che il team t gioca nel periodo p
@@ -109,10 +115,10 @@ constraint forall(p in 1..num_periods) (
 );
 
 */
-
-%% extension deficient
 array[Teams, 1..num_periods] of var 0..(num_teams-1): occ; 
 
+
+%% extension deficient
 constraint forall(t in Teams, p in 1..num_periods) ( occ[t,p] = sum(j in Teams where j != t)( bool2int(period[t,j] == p) ) );
 
 % Deficient[t,p] = 1 iff occ[t,p] == 1
@@ -126,11 +132,9 @@ constraint forall(t in Teams)(
   sum(p in 1..num_periods)( bool2int(deficient[t,p]) ) <= 1
 );
 */
-
 % Every team is deficient in at most one period
 constraint forall(t in Teams)(
-    count_leq([deficient[t,p] | p in 1..num_periods], true, 1)
-);
+    count_leq([deficient[t,p] | p in 1..num_periods], true, 1));
 /*
 constraint forall(t in Teams) (
     sum(p in 1..num_periods)(bool2int(deficient[t,p])) = 1 %better for n=18 (2 sec) but worse for n=20 (96 sec)
@@ -138,15 +142,13 @@ constraint forall(t in Teams) (
 */
 % --- END implicit constraints --
 
-
-solve satisfy; %best one
+%solve satisfy; %best one
 %results for n=18
 %solve :: int_search([period[i,j] | i,j in Teams where i<j] ++ [home[i,j] | i,j in Teams where i<j], input_order, indomain_random) satisfy; Not supported by chuffed
 
-%solve :: int_search([period[i,j] | i,j in Teams where i<j] ++ [home[i,j] | i,j in Teams where i<j], first_fail, indomain_min) satisfy; 60s
+%solve :: int_search([period[i,j] | i,j in Teams where i<j] ++ [home[i,j] | i,j in Teams where i<j], first_fail, indomain_min) satisfy; %60s
 
 %solve :: int_search([period[i,j] | i,j in Teams where i<j]++[home[i,j]| i,j in Teams where i<j], dom_w_deg, indomain_min) :: restart_luby(50) satisfy;
-%solve :: int_search([period[i,j] | i,j in Teams where i<j]++ [home[i,j]| i,j in Teams where i<j], dom_w_deg, indomain_random)::relax_and_reconstruct([period[i,j] | i,j in Teams where i<j] ++ [home[i,j]| i,j in Teams where i<j], 85) satisfy;
 %solve::seq_search([
 %int_search([period[i,j] | i,j in Teams where i<j], first_fail, indomain_split), 
 %int_search([home[i,j] | i,j in Teams where i<j], first_fail, indomain_split)]) satisfy;
@@ -155,3 +157,12 @@ solve::seq_search([
   int_search([period[i,j] | i,j in Teams where i<j], random_order, indomain_split), 
   int_search([home[i,j] | i,j in Teams where i<j], random_order, indomain_split)]) :: restart_luby(50) satisfy;
  */
+ /*solve :: int_search(
+    [period[i,j] | i,j in Teams where i<j],  % 1. Solo le variabili 'period'
+    dom_w_deg,                             % 2. L'euristica più "intelligente"
+    indomain_random,                       % 3. L'elemento casuale
+)
+:: restart_luby(100)                      % 4. Riavvia la ricerca
+satisfy;*/ %for gecode only
+
+solve :: restart_luby(100) satisfy;
