@@ -12,6 +12,9 @@ class MIPBaseSolver(BaseSolver):
 
     Provides common attributes and hooks (weeks, periods, backend).
     Concrete implementations can use OR-Tools, CBC, SCIP, etc.
+    
+    Note: OR-Tools MIP solvers run in C++ and don't respond to Ctrl+C
+    during solving. Use the timeout parameter to limit solving time.
     """
 
     def __init__(self, n: int, timeout: int = 300, optimization: bool = False, backend: Optional[str] = None):

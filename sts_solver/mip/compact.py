@@ -179,6 +179,5 @@ class MIPCompactNativeSolver(MIPBaseSolver):
             approach="MIP",
             version="1.0",
             supports_optimization=False,
-            max_recommended_size=16,
             description="Compact MIP formulation (class-based)",
         )

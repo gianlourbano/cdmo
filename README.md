@@ -92,7 +92,14 @@ uv run sts solve 6 SMT --solver presolve_2 --optimization
 List available solvers and formulations:
 
 ```bash
-uv run sts list-solvers --solvers
+# List all solvers
+uv run sts list-solvers
+
+# Filter by approach
+uv run sts list-solvers --approach MIP
+
+# Show detailed information
+uv run sts list-solvers --verbose
 ```
 
 Run benchmark:
@@ -185,8 +192,8 @@ docker run --rm -v $(pwd)/res:/app/res sts-solver uv run sts benchmark 20
 The CLI is backed by a unified registry that lists and instantiates solvers across all approaches (CP, SAT, SMT, MIP). Use:
 
 ```bash
-uv run sts list-solvers --solvers
-````
+uv run sts list-solvers
+```
 
 to discover registered solver names and descriptions. The `solve` command accepts these names via `--solver` and falls back to a recommended default when omitted.
 
@@ -332,6 +339,25 @@ Type checking:
 ```bash
 uv run mypy sts_solver
 ```
+
+## Known Issues
+
+### MIP Solvers: Ctrl+C Not Working
+
+**Issue:** MIP solvers (OR-Tools) cannot be interrupted with Ctrl+C during solving.
+
+**Why:** OR-Tools runs in C++ and doesn't check Python's interrupt signals.
+
+**Workaround:** Use appropriate timeouts:
+```bash
+# Use shorter timeout for testing
+uv run sts solve 20 MIP --solver optimized --timeout 60
+```
+
+**Affected:** All MIP solvers (standard, optimized, compact, etc.)  
+**Not Affected:** CP, SAT, SMT solvers (can be interrupted normally)
+
+See `KNOWN_ISSUES.md` for details and workarounds.
 
 ## Project Requirements
 

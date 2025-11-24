@@ -43,6 +43,7 @@ class SolverRegistry:
         return result
 
     def find_best_solver(self, approach: str, n: int, optimization: bool = False) -> Optional[str]:
+        print("CALLED THIS UGLY MF")
         names: List[str] = []
         for name, cls in self._solvers.get(approach, {}).items():
             md = cls.get_metadata()

@@ -10,6 +10,55 @@ import json
 from pathlib import Path
 
 
+class CompactJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder that keeps matrix rows on single lines"""
+    
+    def encode(self, obj):
+        if isinstance(obj, dict):
+            # Handle the top-level dictionary
+            items = []
+            for key, value in obj.items():
+                encoded_value = self._encode_solution_dict(value)
+                items.append(f'  "{key}": {encoded_value}')
+            return "{\n" + ",\n".join(items) + "\n}"
+        return super().encode(obj)
+    
+    def _encode_solution_dict(self, obj):
+        """Encode a solution dictionary with compact sol format"""
+        if not isinstance(obj, dict):
+            return json.dumps(obj)
+        
+        parts = []
+        parts.append("{\n")
+        
+        for key, value in obj.items():
+            if key == "sol" and isinstance(value, list):
+                # Special handling for sol: each period on one line
+                parts.append(f'    "{key}": [\n')
+                period_lines = []
+                for period in value:
+                    # Each period (list of games) on one line
+                    period_lines.append(f'      {json.dumps(period)}')
+                parts.append(",\n".join(period_lines))
+                parts.append("\n    ]")
+            else:
+                # Regular fields
+                parts.append(f'    "{key}": {json.dumps(value)}')
+            
+            # Add comma if not last item
+            if key != list(obj.keys())[-1]:
+                parts.append(",\n")
+            else:
+                parts.append("\n")
+        
+        parts.append("  }")
+        return "".join(parts)
+    
+    def iterencode(self, obj, _one_shot=False):
+        """Override to use our custom encoding"""
+        yield self.encode(obj)
+
+
 class STSSolution:
     """Represents a solution to the STS problem"""
     
@@ -66,9 +115,9 @@ def save_results(
     for solver_name, solution in results.items():
         existing_data[solver_name] = solution.to_dict()
     
-    # Write back the merged data
+    # Write back the merged data with compact sol format
     with open(output_file, 'w') as f:
-        json.dump(existing_data, f, indent=2)
+        f.write(CompactJSONEncoder().encode(existing_data))
 
 
 def validate_solution(n: int, sol: List[List[List[int]]]) -> bool:

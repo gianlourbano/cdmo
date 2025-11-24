@@ -13,6 +13,7 @@ COPY pyproject.toml ./
 COPY sts_solver/ ./sts_solver/
 COPY source/ ./source/
 COPY README.md ./
+COPY run_all.sh ./
 
 # Install Python dependencies with uv
 RUN uv sync
