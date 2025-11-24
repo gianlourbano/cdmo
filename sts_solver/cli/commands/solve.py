@@ -52,7 +52,15 @@ def solve(
     if solver:
         click.echo(f"Using solver: {solver}")
 
-    chosen = solver or registry.find_best_solver(approach, n, optimization)
+    backend: Optional[str] = None
+    chosen_solver_arg = solver
+    # Support formulation-backend pattern for MIP (e.g. optimized-SCIP)
+    if solver and approach == "MIP" and "-" in solver:
+        parts = solver.split("-", 1)
+        chosen_solver_arg = parts[0]
+        backend = parts[1]
+
+    chosen = chosen_solver_arg or registry.find_best_solver(approach, n, optimization)
     if not chosen:
         click.echo(f"Error: No suitable solver found for {approach}", err=True)
         raise SystemExit(1)
@@ -64,6 +72,8 @@ def solve(
 
     start_time = time.time()
     instance = solver_cls(n, effective_timeout, optimization)
+    if approach == "MIP" and backend and hasattr(instance, "backend"):
+        setattr(instance, "backend", backend)  # type: ignore[attr-defined]
 
     with handle_solver_errors(rethrow=False):
         result = instance.solve()

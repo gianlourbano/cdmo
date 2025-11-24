@@ -10,7 +10,7 @@ from ..base_solver import SolverMetadata
 
 
 class SMTOptimizedNativeSolver(SMTBaseSolver):
-    """Optimized SMT formulation (class-based) mirroring z3_optimized."""
+    """Optimized SMT formulation (class-based)."""
 
     def _build_model(self) -> Tuple[Solver, Dict[str, Any]]:
         weeks = self.weeks

@@ -1,8 +1,10 @@
 import time
-from typing import Optional, List, Dict, Tuple
+from typing import Any, List, Dict, Tuple
 from ortools.linear_solver import pywraplp
 
 from ..utils.solution_format import STSSolution
+from .base import MIPBaseSolver
+from ..base_solver import SolverMetadata
 
 def schedule_iterative_divide_and_conquer(n: int) -> Dict[int, List[Tuple[int, int]]]:
     """
@@ -52,101 +54,79 @@ def home_away_balance(matches_per_week, n):
         balanced[w] = row
     return balanced
 
-def presolve_sts(n:int,
-                 solver_name: Optional[str] = None,
-                 timeout: int = 300, optimization: bool = False) -> STSSolution:
-    if n % 2 != 0:
-        return STSSolution(time=0, optimal=False, obj=None, sol=[])
-    
-    solver = pywraplp.Solver.CreateSolver('SCIP')
-    solver.SetTimeLimit(timeout * 1000)  # milliseconds
+class MIPPresolveSolver(MIPBaseSolver):
+    """Presolve-based formulation using deterministic round-robin schedule.
+    Name: 'presolve'. No optimization objective implemented.
+    """
 
-    if not solver:
-        return STSSolution(time=0, optimal=False, obj=None, sol=[])
-    
-    #solver.setNumThreads(1)
-    #solver.setTimeLimit(timeout * 1000) 
+    def _build_model(self) -> Any:
+        return None
 
-    # apply circle method to generate initial schedule
-    start_time = time.time()
-    weeks = n - 1
-    periods = n // 2
-
-    games = schedule_iterative_divide_and_conquer(n)
-    matches_per_week = home_away_balance(games, n)
-
-    weeks = sorted(matches_per_week.keys())
-    teams=list(range(1, n + 1))
-
-    # after having precomputed the matches, we only need to assign them to periods, so the only contraint we have
-    # is that no team can play more than twice in the same period
-
-    # === VARIABLES ===
-    # x[w, p, i, j] = 1 if match (i,j) in week w is assigned to period p.
-    # Note: (i,j) are already fixed for a given week w by the presolver.
-    x = {}
-    for w in weeks:
-        for p in range(1, periods + 1):
-            for i, j in matches_per_week[w]:
-                x[w, p, i, j] = solver.BoolVar(f"x_{w}_{p}_{i}_{j}")
-
-    # === CONSTRAINTS ===
-
-    # 1. Each pre-solved match must be assigned to exactly one period.
-    for w in weeks:
-        for i, j in matches_per_week[w]:
-            solver.Add(solver.Sum(x[w, p, i, j] for p in range(1, periods + 1)) == 1, f"match_once_{w}_{i}_{j}")
-
-    # 2. In each week, each period can only have one match.
-    for w in weeks:
-        for p in range(1, periods + 1):
-            solver.Add(solver.Sum(x[w, p, i, j] for i, j in matches_per_week[w]) == 1, f"slot_once_{w}_{p}")
-
-    # 3. Each team plays at most twice in any given period across all weeks.
-    for t in teams:
-        for p in range(1, periods + 1):
-            team_appearances = []
-            for w in weeks:
+    def _solve_model(self, model: Any) -> STSSolution:
+        n = self.n
+        backend = (self.backend or "SCIP").upper()
+        solver = pywraplp.Solver.CreateSolver(backend)
+        if not solver:
+            return STSSolution(time=0, optimal=False, obj=None, sol=[])
+        solver.SetTimeLimit(self.timeout * 1000)
+        weeks = n - 1
+        periods = n // 2
+        games = schedule_iterative_divide_and_conquer(n)
+        matches_per_week = home_away_balance(games, n)
+        week_keys = sorted(matches_per_week.keys())
+        teams = list(range(1, n + 1))
+        x = {}
+        for w in week_keys:
+            for p in range(1, periods + 1):
                 for i, j in matches_per_week[w]:
-                    if t == i or t == j:
-                        team_appearances.append(x[w, p, i, j])
-            solver.Add(solver.Sum(team_appearances) <= 2, f"period_limit_{t}_{p}")
-            
-    # === SYMMETRY BREAKING (Optional but helpful) ===
-    w1 = weeks[0]
-    for k, (i, j) in enumerate(sorted(matches_per_week[w1])):
-        # Assign match k of week 1 to period k+1
-        solver.Add(x[w1, k + 1, i, j] == 1)
-
-    # === SOLVE ===
-    status = solver.Solve()
-    elapsed_time = int(time.time() - start_time)
-
-     # === EXTRACT SOLUTION ===
-    if status == pywraplp.Solver.OPTIMAL or status == pywraplp.Solver.FEASIBLE:
-        sol_weeks = [[] for _ in weeks]
-        for w_idx, w in enumerate(weeks):
-            week_schedule = [[] for _ in range(periods)]
+                    x[w, p, i, j] = solver.BoolVar(f"x_{w}_{p}_{i}_{j}")
+        # Constraints
+        for w in week_keys:
+            for i, j in matches_per_week[w]:
+                solver.Add(solver.Sum(x[w, p, i, j] for p in range(1, periods + 1)) == 1)
+        for w in week_keys:
+            for p in range(1, periods + 1):
+                solver.Add(solver.Sum(x[w, p, i, j] for i, j in matches_per_week[w]) == 1)
+        for t in teams:
+            for p in range(1, periods + 1):
+                team_apps = []
+                for w in week_keys:
+                    for i, j in matches_per_week[w]:
+                        if t in (i, j):
+                            team_apps.append(x[w, p, i, j])
+                solver.Add(solver.Sum(team_apps) <= 2)
+        # Symmetry: first week ordering
+        w1 = week_keys[0]
+        for k, (i, j) in enumerate(sorted(matches_per_week[w1])):
+            solver.Add(x[w1, k + 1, i, j] == 1)
+        status = solver.Solve()
+        elapsed = self.elapsed_time
+        if status not in {pywraplp.Solver.OPTIMAL, pywraplp.Solver.FEASIBLE}:
+            return STSSolution(time=min(elapsed, self.timeout), optimal=False, obj=None, sol=[])
+        sol_weeks = [[] for _ in week_keys]
+        for idx, w in enumerate(week_keys):
+            week_sched = [[] for _ in range(periods)]
             for p in range(1, periods + 1):
                 for i, j in matches_per_week[w]:
                     if x[w, p, i, j].solution_value() > 0.5:
-                        week_schedule[p-1] = [i, j]
+                        week_sched[p - 1] = [i, j]
                         break
-            sol_weeks[w_idx] = week_schedule
-        
-        # Transpose to periods x weeks format
+            sol_weeks[idx] = week_sched
         sol_periods = list(zip(*sol_weeks))
-
+        sol_periods = [list(games) for games in sol_periods]
         return STSSolution(
-            time=elapsed_time,
+            time=min(elapsed, self.timeout),
             optimal=(status == pywraplp.Solver.OPTIMAL),
-            obj=None, # Objective can be added here if needed
-            sol=sol_periods
-        )
-    else:
-        return STSSolution(
-            time=min(elapsed_time, timeout),
-            optimal=False,
             obj=None,
-            sol=[]
+            sol=sol_periods,
+        )
+
+    @classmethod
+    def get_metadata(cls) -> SolverMetadata:
+        return SolverMetadata(
+            name="presolve",
+            approach="MIP",
+            version="1.0",
+            supports_optimization=False,
+            description="Presolve formulation assigning precomputed matches to periods",
         )

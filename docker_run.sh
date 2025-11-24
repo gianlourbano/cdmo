@@ -36,7 +36,7 @@ docker run --rm \
         echo ''
         echo 'Validating results using official checker...'
         if [ -f /app/solution_checker.py ]; then
-            uv run sts-solve validate-all --official
+            uv run sts validate-all --official
         else
             echo 'Note: solution_checker.py not found, skipping validation'
             echo 'Place solution_checker.py in project root to enable validation'

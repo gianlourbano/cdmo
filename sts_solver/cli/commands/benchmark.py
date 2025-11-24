@@ -1,11 +1,19 @@
-"""Benchmark commands (modular CLI)"""
+"""Benchmark commands (modular CLI) with optional optimization support.
 
+Adds `--optimization/-O` flag so that all benchmark styles (single approach
+and comprehensive) can invoke solvers in optimization mode when they
+support it. Objective values (if any) are printed after each run.
+"""
+
+import json
 import time
+from pathlib import Path
 from typing import Optional, List
 import click
 
 from ..utils import get_solvers_for_approach
 from ...config import get_config
+from ...registry import registry
 from .solve import solve as solve_command
 
 
@@ -15,8 +23,13 @@ from .solve import solve as solve_command
 @click.option("--solver", "-s", help="Specific solver to use")
 @click.option("--timeout", "-t", type=int, default=None, help="Timeout in seconds (defaults from config)")
 @click.option("--all-solvers", is_flag=True, help="Run all available solvers for the approach")
-def benchmark(max_n: int, approach: str, solver: Optional[str], timeout: Optional[int], all_solvers: bool):
-    """Run benchmark for instances from 4 to MAX_N teams."""
+@click.option("--optimization", "-O", is_flag=True, help="Enable optimization mode (only solvers supporting it)")
+def benchmark(max_n: int, approach: str, solver: Optional[str], timeout: Optional[int], all_solvers: bool, optimization: bool):
+    """Run benchmark for instances from 4 to MAX_N teams.
+
+    When `--optimization` is set, only solvers declaring optimization support
+    are exercised and their objective values (if present) are reported.
+    """
 
     cfg = get_config()
     effective_timeout = timeout if timeout is not None else cfg.benchmark_timeout
@@ -24,11 +37,20 @@ def benchmark(max_n: int, approach: str, solver: Optional[str], timeout: Optiona
     if all_solvers:
         click.echo(f"Running comprehensive benchmark for {approach} approach up to {max_n} teams")
         solvers_to_test = get_solvers_for_approach(approach)
+        # Filter for optimization support if requested
+        if optimization:
+            filtered: List[str] = []
+            for s in solvers_to_test:
+                md = registry.get_metadata(approach, s)
+                if md and md.supports_optimization:
+                    filtered.append(s)
+            solvers_to_test = filtered
         click.echo(f"Testing solvers: {', '.join(solvers_to_test)}")
     else:
         click.echo(f"Running benchmark for {approach} approach up to {max_n} teams")
         if solver:
             click.echo(f"Using solver: {solver}")
+        # Single solver or default selection; default will be chosen via registry taking optimization flag into account
         solvers_to_test = [solver] if solver else [None]
 
     for n in range(4, max_n + 1, 2):
@@ -37,20 +59,41 @@ def benchmark(max_n: int, approach: str, solver: Optional[str], timeout: Optiona
         click.echo(f"{'='*50}")
 
         for test_solver in solvers_to_test:
+            chosen_solver_name: Optional[str] = test_solver
             if test_solver:
                 click.echo(f"\nTesting {approach} with {test_solver}...")
             else:
-                click.echo(f"\nTesting {approach} with default solver...")
+                chosen_solver_name = registry.find_best_solver(approach, n, optimization)
+                click.echo(f"\nTesting {approach} with default solver ({chosen_solver_name})...")
 
             try:
                 start_time = time.time()
-                # call click command's callback directly to avoid CLI context complexity
                 cb = getattr(solve_command, 'callback', None)
                 if cb is None:
                     raise RuntimeError('solve callback not available')
-                cb(n=n, approach=approach, solver=test_solver, timeout=effective_timeout, output=None, optimization=False, name=test_solver)
+                cb(n=n, approach=approach, solver=test_solver, timeout=effective_timeout, output=None, optimization=optimization, name=test_solver)
                 elapsed = time.time() - start_time
-                click.echo(f"OK ({elapsed:.1f}s)")
+
+                # Read objective if optimization enabled
+                if optimization and chosen_solver_name:
+                    cfg = get_config()
+                    results_path = cfg.results_dir / approach / f"{n}.json"
+                    if results_path.exists():
+                        try:
+                            with open(results_path) as rf:
+                                data = json.load(rf)
+                            entry = data.get(chosen_solver_name)
+                            obj_val = entry.get("obj") if entry else None
+                            if obj_val is not None:
+                                click.echo(f"OK ({elapsed:.1f}s) objective={obj_val}")
+                            else:
+                                click.echo(f"OK ({elapsed:.1f}s) objective=NA")
+                        except Exception:
+                            click.echo(f"OK ({elapsed:.1f}s) objective=ERROR")
+                    else:
+                        click.echo(f"OK ({elapsed:.1f}s) objective=FILE_MISSING")
+                else:
+                    click.echo(f"OK ({elapsed:.1f}s)")
             except Exception as e:
                 click.echo(f"Error with {test_solver or 'default'}: {e}", err=True)
 
@@ -59,8 +102,13 @@ def benchmark(max_n: int, approach: str, solver: Optional[str], timeout: Optiona
 @click.argument("max_n", type=int)
 @click.option("--timeout", "-t", type=int, default=None, help="Timeout in seconds (defaults from config)")
 @click.option("--approaches", help="Comma-separated list of approaches (CP,SAT,SMT,MIP)")
-def comprehensive_benchmark(max_n: int, timeout: Optional[int], approaches: Optional[str]):
-    """Run comprehensive benchmark across ALL approaches and solvers."""
+@click.option("--optimization", "-O", is_flag=True, help="Enable optimization mode when supported")
+def comprehensive_benchmark(max_n: int, timeout: Optional[int], approaches: Optional[str], optimization: bool):
+    """Run comprehensive benchmark across ALL approaches and solvers.
+
+    With `--optimization`, only solvers advertising optimization support are
+    exercised and their objective values are printed.
+    """
 
     cfg = get_config()
     effective_timeout = timeout if timeout is not None else cfg.benchmark_timeout
@@ -85,7 +133,14 @@ def comprehensive_benchmark(max_n: int, timeout: Optional[int], approaches: Opti
         click.echo("-" * 40)
 
         solvers = get_solvers_for_approach(approach)
-        click.echo(f"Solvers to test: {', '.join(solvers)}")
+        if optimization:
+            filtered2: List[str] = []
+            for s in solvers:
+                md = registry.get_metadata(approach, s)
+                if md and md.supports_optimization:
+                    filtered2.append(s)
+            solvers = filtered2
+        click.echo(f"Solvers to test: {', '.join(solvers) if solvers else '(none)'}")
 
         for n in range(4, max_n + 1, 2):
             click.echo(f"\nInstance: {n} teams")
@@ -99,10 +154,26 @@ def comprehensive_benchmark(max_n: int, timeout: Optional[int], approaches: Opti
                     cb = getattr(solve_command, 'callback', None)
                     if cb is None:
                         raise RuntimeError('solve callback not available')
-                    cb(n=n, approach=approach, solver=solver, timeout=effective_timeout, output=None, optimization=False, name=solver)
+                    cb(n=n, approach=approach, solver=solver, timeout=effective_timeout, output=None, optimization=optimization, name=solver)
                     elapsed = time.time() - start_time
                     completed_experiments += 1
-                    click.echo(f" OK ({elapsed:.1f}s)")
+
+                    if optimization:
+                        cfg = get_config()
+                        results_path = cfg.results_dir / approach / f"{n}.json"
+                        obj_txt = "obj=NA"
+                        if results_path.exists():
+                            try:
+                                with open(results_path) as rf:
+                                    data = json.load(rf)
+                                entry = data.get(solver)
+                                if entry and entry.get("obj") is not None:
+                                    obj_txt = f"obj={entry.get('obj')}"
+                            except Exception:
+                                obj_txt = "obj=ERR"
+                        click.echo(f" OK ({elapsed:.1f}s, {obj_txt})")
+                    else:
+                        click.echo(f" OK ({elapsed:.1f}s)")
                 except Exception as e:
                     click.echo(f" Error: {str(e)[:50]}...")
 

@@ -30,8 +30,6 @@ RUN wget https://github.com/MiniZinc/MiniZincIDE/releases/download/2.7.5/MiniZin
     && ln -s /opt/minizinc/bin/mzn2fzn /usr/local/bin/mzn2fzn \
     && rm MiniZincIDE-2.7.5-bundle-linux-x86_64.tgz
 
-
-
 # Create results directory
 RUN mkdir -p res/{CP,SAT,SMT,MIP}
 

@@ -1,194 +1,144 @@
-"""
-Simplified match-based MIP formulation that's more MIP-friendly
-"""
+"""Class-based simplified match formulation (previously function-based)."""
 
 import time
-from typing import Optional
+from typing import Any
 from ortools.linear_solver import pywraplp
 
 from ..utils.solution_format import STSSolution
+from .base import MIPBaseSolver
+from ..base_solver import SolverMetadata
 
 
-def solve_sts_simple_match(
-    n: int,
-    solver_name: Optional[str] = None,
-    timeout: int = 300,
-    optimization: bool = False
-) -> STSSolution:
+class MIPMatchSolver(MIPBaseSolver):
+    """Simplified match-based MIP formulation using x/h variables.
+
+    Metadata name: 'match'
+    Supports optimization via home/away imbalance objective.
     """
-    Solve STS using simplified match-based formulation
-    
-    Variables:
-    - x[t1,t2,w,p] = 1 if teams t1,t2 play in week w, period p (with t1 < t2)
-    - h[t1,t2,w,p] = 1 if t1 plays at home vs t2 in week w, period p
-    
-    This is still more compact than schedule[w,p,slot] approach
-    """
-    
-    if n % 2 != 0:
-        return STSSolution(time=0, optimal=False, obj=None, sol=[])
-    
-    start_time = time.time()
-    weeks = n - 1
-    periods = n // 2
-    
-    try:
-        # Solver initialization
-        if solver_name and solver_name.upper() == "SCIP":
-            solver = pywraplp.Solver.CreateSolver("SCIP")
-        elif solver_name and solver_name.upper() == "GUROBI":
-            solver = pywraplp.Solver.CreateSolver("GUROBI")
-        else:
-            solver = pywraplp.Solver.CreateSolver("CBC")
-        
+
+    def _build_model(self) -> Any:  # Not separating model build; all in _solve_model
+        return None
+
+    def _solve_model(self, model: Any) -> STSSolution:  # noqa: D401
+        n = self.n
+        weeks = self.weeks
+        periods = self.periods
+
+        # Solver selection by backend (SCIP, GUROBI, CBC)
+        backend = (self.backend or "CBC").upper()
+        if backend not in {"SCIP", "GUROBI", "CBC"}:
+            backend = "CBC"
+        solver = pywraplp.Solver.CreateSolver(backend)
         if not solver:
             return STSSolution(time=0, optimal=False, obj=None, sol=[])
-        
-        solver.set_time_limit(timeout * 1000)
-        
-        # === VARIABLES ===
-        # x[t1,t2,w,p] = 1 if teams t1,t2 play in week w, period p (t1 < t2)
+        solver.set_time_limit(self.timeout * 1000)
+
+        # Variables
         x = {}
-        # h[t1,t2,w,p] = 1 if t1 plays at home vs t2 in week w, period p  
         h = {}
-        
         for t1 in range(1, n + 1):
             for t2 in range(t1 + 1, n + 1):
                 for w in range(weeks):
                     for p in range(periods):
                         x[t1, t2, w, p] = solver.BoolVar(f"x_{t1}_{t2}_{w}_{p}")
                         h[t1, t2, w, p] = solver.BoolVar(f"h_{t1}_{t2}_{w}_{p}")
-                        
-                        # h can only be 1 if x is 1
                         solver.Add(h[t1, t2, w, p] <= x[t1, t2, w, p])
-        
-        num_match_vars = n * (n-1) // 2
-        total_vars = num_match_vars * weeks * periods * 2  # x and h variables
-        baseline_vars = n * weeks * periods * 2  # schedule[w,p,slot] variables
-        
-        print(f"Match-based variables: {total_vars} vs Baseline: {baseline_vars}")
-        
-        # === CONSTRAINTS ===
-        
-        # 1. Each pair plays exactly once
+
+        # Constraints
+        # 1. Each pair once
         for t1 in range(1, n + 1):
             for t2 in range(t1 + 1, n + 1):
-                total_games = []
-                for w in range(weeks):
-                    for p in range(periods):
-                        total_games.append(x[t1, t2, w, p])
-                solver.Add(solver.Sum(total_games) == 1, f"once_total_{t1}_{t2}")
-        
-        # 2. Each team plays exactly once per week
+                solver.Add(
+                    solver.Sum(x[t1, t2, w, p] for w in range(weeks) for p in range(periods)) == 1,
+                    f"pair_once_{t1}_{t2}"
+                )
+        # 2. Team once per week
         for t in range(1, n + 1):
             for w in range(weeks):
-                weekly_games = []
+                weekly = []
                 for t2 in range(1, n + 1):
-                    if t2 != t:
-                        for p in range(periods):
-                            if t < t2:
-                                weekly_games.append(x[t, t2, w, p])
-                            else:
-                                weekly_games.append(x[t2, t, w, p])
-                solver.Add(solver.Sum(weekly_games) == 1, f"once_per_week_{t}_{w}")
-        
-        # 3. Each period in each week has exactly one match
+                    if t2 == t:
+                        continue
+                    for p in range(periods):
+                        if t < t2:
+                            weekly.append(x[t, t2, w, p])
+                        else:
+                            weekly.append(x[t2, t, w, p])
+                solver.Add(solver.Sum(weekly) == 1, f"team_week_{t}_{w}")
+        # 3. One match per (week,period)
         for w in range(weeks):
             for p in range(periods):
-                period_games = []
-                for t1 in range(1, n + 1):
-                    for t2 in range(t1 + 1, n + 1):
-                        period_games.append(x[t1, t2, w, p])
-                solver.Add(solver.Sum(period_games) == 1, f"one_per_period_{w}_{p}")
-        
-        # 4. Each team plays at most twice in the same period
+                solver.Add(
+                    solver.Sum(x[t1, t2, w, p] for t1 in range(1, n + 1) for t2 in range(t1 + 1, n + 1)) == 1,
+                    f"slot_unique_{w}_{p}"
+                )
+        # 4. At most twice per period per team
         for t in range(1, n + 1):
             for p in range(periods):
-                period_appearances = []
+                appear = []
                 for t2 in range(1, n + 1):
-                    if t2 != t:
-                        for w in range(weeks):
-                            if t < t2:
-                                period_appearances.append(x[t, t2, w, p])
-                            else:
-                                period_appearances.append(x[t2, t, w, p])
-                solver.Add(solver.Sum(period_appearances) <= 2, f"at_most_twice_{t}_{p}")
-        
-        # Symmetry breaking
+                    if t2 == t:
+                        continue
+                    for w in range(weeks):
+                        if t < t2:
+                            appear.append(x[t, t2, w, p])
+                        else:
+                            appear.append(x[t2, t, w, p])
+                solver.Add(solver.Sum(appear) <= 2, f"period_cap_{t}_{p}")
+        # Symmetry
         if n >= 2:
-            solver.Add(x[1, 2, 0, 0] == 1, "fix_first_match")
-            solver.Add(h[1, 2, 0, 0] == 1, "fix_first_home")
-        
-        # === SOLVE ===
-        print(f"Solving with {solver.NumConstraints()} constraints, {solver.NumVariables()} variables")
+            solver.Add(x[1, 2, 0, 0] == 1)
+            solver.Add(h[1, 2, 0, 0] == 1)
+
         status = solver.Solve()
-        elapsed_time = int(time.time() - start_time)
-        
-        if status == pywraplp.Solver.OPTIMAL or status == pywraplp.Solver.FEASIBLE:
-            # Extract solution
-            sol = [[] for _ in range(periods)]
-            
-            # Find which match is in each slot
-            for w in range(weeks):
-                for p in range(periods):
-                    for t1 in range(1, n + 1):
-                        for t2 in range(t1 + 1, n + 1):
-                            if x[t1, t2, w, p].solution_value() > 0.5:
-                                # This match happens in week w, period p
-                                if h[t1, t2, w, p].solution_value() > 0.5:
-                                    home_team, away_team = t1, t2
-                                else:
-                                    home_team, away_team = t2, t1
-                                
-                                # Ensure sol[p] has enough weeks
-                                while len(sol[p]) <= w:
-                                    sol[p].append([0, 0])
-                                
-                                sol[p][w] = [home_team, away_team]
-                                break
-            
-            # Fill missing slots
+        elapsed = self.elapsed_time
+        if status not in {pywraplp.Solver.OPTIMAL, pywraplp.Solver.FEASIBLE}:
+            return STSSolution(time=min(elapsed, self.timeout), optimal=False, obj=None, sol=[])
+
+        sol = [[] for _ in range(periods)]
+        for w in range(weeks):
             for p in range(periods):
-                while len(sol[p]) < weeks:
-                    sol[p].append([0, 0])
-            
-            is_optimal = (status == pywraplp.Solver.OPTIMAL)
-            
-            return STSSolution(
-                time=elapsed_time,
-                optimal=is_optimal,
-                obj=None if not optimization else calculate_balance_objective(sol, n),
-                sol=sol
-            )
-        else:
-            return STSSolution(
-                time=timeout if elapsed_time >= timeout else elapsed_time,
-                optimal=False,
-                obj=None,
-                sol=[]
-            )
-            
-    except Exception as e:
-        elapsed_time = int(time.time() - start_time)
-        print(f"Exception in simple match-based MIP: {e}")
+                for t1 in range(1, n + 1):
+                    placed = False
+                    for t2 in range(t1 + 1, n + 1):
+                        if x[t1, t2, w, p].solution_value() > 0.5:
+                            home_team, away_team = (t1, t2) if h[t1, t2, w, p].solution_value() > 0.5 else (t2, t1)
+                            while len(sol[p]) <= w:
+                                sol[p].append([0, 0])
+                            sol[p][w] = [home_team, away_team]
+                            placed = True
+                            break
+                    if placed:
+                        continue
+        for p in range(periods):
+            while len(sol[p]) < weeks:
+                sol[p].append([0, 0])
+
+        obj = None
+        if self.optimization:
+            home_counts = [0] * (n + 1)
+            away_counts = [0] * (n + 1)
+            for period_games in sol:
+                for home, away in period_games:
+                    if home > 0 and away > 0:
+                        home_counts[home] += 1
+                        away_counts[away] += 1
+            obj = sum(abs(home_counts[t] - away_counts[t]) for t in range(1, n + 1))
+
         return STSSolution(
-            time=elapsed_time,
-            optimal=False,
-            obj=None,
-            sol=[]
+            time=min(elapsed, self.timeout),
+            optimal=(status == pywraplp.Solver.OPTIMAL),
+            obj=obj,
+            sol=sol,
         )
 
-
-def calculate_balance_objective(sol, n):
-    """Calculate home/away balance objective (lower is better)"""
-    home_counts = [0] * (n + 1)
-    away_counts = [0] * (n + 1)
-    
-    for period_games in sol:
-        for home, away in period_games:
-            if home > 0 and away > 0:
-                home_counts[home] += 1
-                away_counts[away] += 1
-    
-    total_imbalance = sum(abs(home_counts[t] - away_counts[t]) for t in range(1, n + 1))
-    return total_imbalance
+    @classmethod
+    def get_metadata(cls) -> SolverMetadata:
+        return SolverMetadata(
+            name="match",
+            approach="MIP",
+            version="1.0",
+            supports_optimization=True,
+            description="Simplified match-based formulation with x/h variables",
+            max_recommended_size=None,
+        )

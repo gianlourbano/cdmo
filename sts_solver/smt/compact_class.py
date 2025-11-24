@@ -2,7 +2,7 @@
 
 import time
 from typing import Any, Dict, Tuple
-from z3 import Solver, Int, Bool, If, And, Sum, is_true
+from z3 import Solver, Int, Bool, If, And, Sum, Implies, is_true
 
 from ..utils.solution_format import STSSolution
 from .base import SMTBaseSolver
@@ -10,7 +10,7 @@ from ..base_solver import SolverMetadata
 
 
 class SMTCompactNativeSolver(SMTBaseSolver):
-    """Compact SMT schedule formulation mirroring z3_compact.py logic."""
+    """Compact SMT schedule formulation (class-based variable-reduced model)."""
 
     def _build_model(self) -> Tuple[Solver, Dict[str, Any]]:
         n = self.n
@@ -80,7 +80,8 @@ class SMTCompactNativeSolver(SMTBaseSolver):
         ordered.sort(key=lambda x: x[1])
         for idx, (key, _) in enumerate(ordered[:periods]):
             if key != (1, 2):
-                s.add(If(match_week[key] == 0, match_period[key] == idx))
+                # Enforce ordering only for week 0 assignments (implication form)
+                s.add(Implies(match_week[key] == 0, match_period[key] == idx))
 
         return s, {
             "match_week": match_week,
@@ -102,31 +103,36 @@ class SMTCompactNativeSolver(SMTBaseSolver):
             match_week = state["match_week"]
             match_period = state["match_period"]
             match_t1_home = state["match_t1_home"]
-            sol = [[] for _ in range(periods)]
+
+            # Build schedule as [weeks][periods] to match other SMT variants
+            schedule = [[[0, 0] for _ in range(periods)] for _ in range(weeks)]
+            def _as_int(ref):
+                try:
+                    return ref.as_long()  # z3 IntNumRef
+                except Exception:
+                    try:
+                        return int(str(ref))
+                    except Exception:
+                        return 0
             for t1 in range(1, self.n + 1):
                 for t2 in range(t1 + 1, self.n + 1):
                     key = (t1, t2)
-                    wv = m.eval(match_week[key]).as_long()
-                    pv = m.eval(match_period[key]).as_long()
+                    wv = _as_int(m.eval(match_week[key]))
+                    pv = _as_int(m.eval(match_period[key]))
                     hv = m.eval(match_t1_home[key])
                     home, away = (t1, t2) if is_true(hv) else (t2, t1)
-                    while len(sol[pv]) <= wv:
-                        sol[pv].append([0, 0])
-                    sol[pv][wv] = [home, away]
-            for p in range(periods):
-                while len(sol[p]) < weeks:
-                    sol[p].append([0, 0])
+                    schedule[wv][pv] = [home, away]
             obj = None
             if self.optimization:
                 home_counts = [0] * (self.n + 1)
                 away_counts = [0] * (self.n + 1)
-                for period_games in sol:
-                    for home, away in period_games:
+                for week_games in schedule:
+                    for home, away in week_games:
                         if home and away:
                             home_counts[home] += 1
                             away_counts[away] += 1
                 obj = sum(abs(home_counts[t] - away_counts[t]) for t in range(1, self.n + 1))
-            return STSSolution(time=elapsed, optimal=True, obj=obj, sol=sol)
+            return STSSolution(time=elapsed, optimal=True, obj=obj, sol=schedule)
         return STSSolution(time=min(elapsed, self.timeout), optimal=False, obj=None, sol=[])
 
     @classmethod

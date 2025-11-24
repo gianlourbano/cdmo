@@ -10,7 +10,7 @@ from ..base_solver import SolverMetadata
 
 
 class SMTBaselineNativeSolver(SMTBaseSolver):
-    """Baseline SMT formulation (class-based) replicating z3_baseline behavior."""
+    """Baseline SMT formulation (class-based)."""
 
     def _build_model(self) -> Tuple[Solver, Dict[str, Any]]:
         weeks = self.weeks

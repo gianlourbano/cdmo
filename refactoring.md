@@ -1,13 +1,15 @@
 # CDMO Project Refactoring Plan
 
 > Progress Update (2025-11-08):
-- Phase 1 (Foundation): Completed (base classes, exceptions, unified registry)
-- Phase 2 (CLI): Completed (modular CLI, new `sts` entrypoint)
-- Phase 3 (Unification): Bridges added for CP/SAT/SMT/MIP; base classes for MIP/SMT created. Internal refactors progressing.
-    - MIP: 'standard', 'compact', and 'optimized' migrated to class-based implementations using `MIPBaseSolver`.
-    - SMT: 'baseline', 'optimized', and 'compact' migrated to class-based implementations using `SMTBaseSolver`. Presolve family still delegated (`presolve`, `presolve_2`, `presolve_3`, `presolve_cvc5`, `presolve_symmetry`).
-- Phase 4 (Config & Errors): Completed (config system, error handling utilities, CLI integration, README updated)
-- Phase 5 (Tests & Docs): Pending
+
+-   Phase 1 (Foundation): Completed (base classes, exceptions, unified registry)
+-   Phase 2 (CLI): Completed (modular CLI, new `sts` entrypoint)
+-   Phase 3 (Unification): Bridges added for CP/SAT/SMT/MIP; base classes for MIP/SMT created. Internal refactors progressing.
+    -   MIP: 'standard', 'compact', and 'optimized' migrated to class-based implementations using `MIPBaseSolver`.
+    -   SMT: 'baseline', 'optimized', 'compact' and presolve family ('presolve', 'presolve_2', 'presolve_3', 'presolve_cvc5', 'presolve_symmetry') migrated to class-based implementations using `SMTBaseSolver` derivatives and wired in the registry.
+    -   SAT: 'baseline' and 'pairwise' migrated to class-based implementations under `SATBaseSolver` and wired in the registry; smoke solves passing (see `res/SAT/6.json`).
+-   Phase 4 (Config & Errors): Completed (config system, error handling utilities, CLI integration, README updated)
+-   Phase 5 (Tests & Docs): Pending
 
 ## Executive Summary
 
@@ -22,6 +24,7 @@ This document outlines a comprehensive refactoring plan for the Sports Tournamen
 ## Current State Analysis
 
 ### Project Structure
+
 ```
 cdmo-project/
 ├── sts_solver/              # Main package
@@ -39,18 +42,21 @@ cdmo-project/
 ### Key Issues Identified
 
 #### 🔴 **Critical Issues**
+
 1. **Massive CLI File** - `main.py` has 680 lines with 15+ commands
 2. **Code Duplication** - Similar solver patterns repeated across 20+ files
 3. **Inconsistent Registry** - Only MIP uses registry pattern
 4. **Missing Abstractions** - No base solver interface
 
 #### 🟡 **Medium Priority Issues**
+
 5. **Tight Coupling** - Direct imports between modules
 6. **Hardcoded Values** - Solver names, timeouts scattered throughout
 7. **Incomplete Type Hints** - ~40% of functions lack proper typing
 8. **Error Handling** - Inconsistent exception handling patterns
 
 #### 🟢 **Nice to Have**
+
 9. **Configuration Management** - No centralized config system
 10. **Testing Infrastructure** - Limited test coverage
 11. **Documentation** - Missing docstrings in many functions
@@ -60,39 +66,46 @@ cdmo-project/
 ## Refactoring Goals
 
 ### Primary Objectives
-- ✅ **Reduce Complexity** - Break down large files into manageable modules
-- ✅ **Eliminate Duplication** - Extract common patterns into base classes
-- ✅ **Improve Maintainability** - Consistent structure across all solvers
-- ✅ **Enhance Testability** - Better separation of concerns
+
+-   ✅ **Reduce Complexity** - Break down large files into manageable modules
+-   ✅ **Eliminate Duplication** - Extract common patterns into base classes
+-   ✅ **Improve Maintainability** - Consistent structure across all solvers
+-   ✅ **Enhance Testability** - Better separation of concerns
 
 ### Success Metrics
-- Main CLI file < 200 lines
-- Code duplication < 10%
-- Test coverage > 70%
-- All public functions have type hints
-- All modules have docstrings
+
+-   Main CLI file < 200 lines
+-   Code duplication < 10%
+-   Test coverage > 70%
+-   All public functions have type hints
+-   All modules have docstrings
 
 ---
 
 ## Refactoring Strategy
 
 ### Phase 1: Foundation (Priority: HIGH)
+
 **Goal:** Establish core abstractions and patterns
 **Duration:** 1-2 days
 
 ### Phase 2: CLI Restructuring (Priority: HIGH)
+
 **Goal:** Modularize command-line interface
 **Duration:** 1 day
 
 ### Phase 3: Solver Unification (Priority: MEDIUM)
+
 **Goal:** Standardize solver implementations
 **Duration:** Ongoing (incremental migration of remaining delegates)
 
 ### Phase 4: Configuration & Error Handling (Priority: MEDIUM)
+
 **Goal:** Centralize configuration and improve error handling
 **Duration:** 1 day
 
 ### Phase 5: Testing & Documentation (Priority: LOW)
+
 **Goal:** Add comprehensive tests and documentation
 **Duration:** Ongoing
 
@@ -130,12 +143,12 @@ class SolverMetadata:
 class BaseSolver(ABC):
     """
     Abstract base class for all STS solvers.
-    
+
     All solver implementations should inherit from this class and implement
     the solve() method. This ensures consistent interface and behavior across
     different approaches.
     """
-    
+
     def __init__(
         self,
         n: int,
@@ -144,12 +157,12 @@ class BaseSolver(ABC):
     ):
         """
         Initialize solver with instance parameters.
-        
+
         Args:
             n: Number of teams (must be even and >= 4)
             timeout: Maximum solving time in seconds
             optimization: Whether to solve optimization version
-            
+
         Raises:
             InvalidInstanceError: If instance parameters are invalid
         """
@@ -158,7 +171,7 @@ class BaseSolver(ABC):
         self.optimization = optimization
         self.start_time: Optional[float] = None
         self._validate_instance()
-    
+
     def _validate_instance(self) -> None:
         """Validate instance parameters"""
         if self.n % 2 != 0:
@@ -167,39 +180,39 @@ class BaseSolver(ABC):
             raise InvalidInstanceError("Number of teams must be at least 4")
         if self.timeout <= 0:
             raise InvalidInstanceError("Timeout must be positive")
-    
+
     @abstractmethod
     def _build_model(self) -> Any:
         """
         Build the solver-specific model.
-        
+
         Returns:
             Solver-specific model object
         """
         pass
-    
+
     @abstractmethod
     def _solve_model(self, model: Any) -> STSSolution:
         """
         Solve the built model and return solution.
-        
+
         Args:
             model: The solver-specific model
-            
+
         Returns:
             STSSolution object with results
         """
         pass
-    
+
     def solve(self) -> STSSolution:
         """
         Main solving method with timing and error handling.
-        
+
         Returns:
             STSSolution object with results
         """
         self.start_time = time.time()
-        
+
         try:
             model = self._build_model()
             solution = self._solve_model(model)
@@ -212,19 +225,19 @@ class BaseSolver(ABC):
                 obj=None,
                 sol=[]
             )
-    
+
     @property
     def elapsed_time(self) -> int:
         """Get elapsed solving time in seconds"""
         if self.start_time is None:
             return 0
         return int(time.time() - self.start_time)
-    
+
     @property
     def is_timeout(self) -> bool:
         """Check if timeout has been reached"""
         return self.elapsed_time >= self.timeout
-    
+
     @classmethod
     @abstractmethod
     def get_metadata(cls) -> SolverMetadata:
@@ -233,10 +246,11 @@ class BaseSolver(ABC):
 ```
 
 **Benefits:**
-- ✅ Consistent interface across all solvers
-- ✅ Built-in validation and error handling
-- ✅ Automatic timing
-- ✅ Easy to test and mock
+
+-   ✅ Consistent interface across all solvers
+-   ✅ Built-in validation and error handling
+-   ✅ Automatic timing
+-   ✅ Easy to test and mock
 
 ### 1.2 Create Unified Registry System
 
@@ -257,11 +271,11 @@ from .base_solver import BaseSolver, SolverMetadata
 class SolverRegistry:
     """
     Global registry for all solver implementations.
-    
+
     This registry manages solver classes across all approaches (CP, SAT, SMT, MIP)
     and provides a unified interface for solver discovery and instantiation.
     """
-    
+
     def __init__(self):
         self._solvers: Dict[str, Dict[str, Type[BaseSolver]]] = {
             'CP': {},
@@ -269,16 +283,16 @@ class SolverRegistry:
             'SMT': {},
             'MIP': {}
         }
-    
+
     def register(self, approach: str, name: str):
         """
         Decorator for registering solver classes.
-        
+
         Usage:
             @registry.register('MIP', 'scip-compact')
             class CompactSCIPSolver(BaseSolver):
                 ...
-        
+
         Args:
             approach: Solver approach (CP, SAT, SMT, MIP)
             name: Unique solver name within the approach
@@ -286,11 +300,11 @@ class SolverRegistry:
         def decorator(cls: Type[BaseSolver]):
             if approach not in self._solvers:
                 self._solvers[approach] = {}
-            
+
             self._solvers[approach][name] = cls
             return cls
         return decorator
-    
+
     def get_solver(
         self,
         approach: str,
@@ -298,37 +312,37 @@ class SolverRegistry:
     ) -> Optional[Type[BaseSolver]]:
         """
         Get solver class by approach and name.
-        
+
         Args:
             approach: Solver approach
             name: Solver name
-            
+
         Returns:
             Solver class or None if not found
         """
         return self._solvers.get(approach, {}).get(name)
-    
+
     def list_solvers(
         self,
         approach: Optional[str] = None
     ) -> Dict[str, List[str]]:
         """
         List available solvers.
-        
+
         Args:
             approach: If provided, only list solvers for this approach
-            
+
         Returns:
             Dictionary mapping approaches to solver names
         """
         if approach:
             return {approach: list(self._solvers.get(approach, {}).keys())}
-        
+
         return {
             approach: list(solvers.keys())
             for approach, solvers in self._solvers.items()
         }
-    
+
     def get_metadata(
         self,
         approach: str,
@@ -336,11 +350,11 @@ class SolverRegistry:
     ) -> Optional[SolverMetadata]:
         """
         Get metadata for a specific solver.
-        
+
         Args:
             approach: Solver approach
             name: Solver name
-            
+
         Returns:
             SolverMetadata or None if solver not found
         """
@@ -348,31 +362,31 @@ class SolverRegistry:
         if solver_cls:
             return solver_cls.get_metadata()
         return None
-    
+
     def get_all_metadata(
         self,
         approach: Optional[str] = None
     ) -> Dict[str, Dict[str, SolverMetadata]]:
         """
         Get metadata for all registered solvers.
-        
+
         Args:
             approach: If provided, only return metadata for this approach
-            
+
         Returns:
             Nested dict: {approach: {solver_name: metadata}}
         """
         result = {}
-        
+
         approaches = [approach] if approach else self._solvers.keys()
-        
+
         for app in approaches:
             result[app] = {}
             for name, cls in self._solvers.get(app, {}).items():
                 result[app][name] = cls.get_metadata()
-        
+
         return result
-    
+
     def find_best_solver(
         self,
         approach: str,
@@ -381,30 +395,30 @@ class SolverRegistry:
     ) -> Optional[str]:
         """
         Find the best solver for given instance parameters.
-        
+
         Args:
             approach: Solver approach
             n: Number of teams
             optimization: Whether optimization is needed
-            
+
         Returns:
             Name of recommended solver, or None
         """
         candidates = []
-        
+
         for name, cls in self._solvers.get(approach, {}).items():
             metadata = cls.get_metadata()
-            
+
             # Check if solver supports optimization if needed
             if optimization and not metadata.supports_optimization:
                 continue
-            
+
             # Check if instance size is within recommendations
             if metadata.max_recommended_size and n > metadata.max_recommended_size:
                 continue
-            
+
             candidates.append(name)
-        
+
         # Return first candidate (could be enhanced with scoring)
         return candidates[0] if candidates else None
 
@@ -414,10 +428,11 @@ registry = SolverRegistry()
 ```
 
 **Benefits:**
-- ✅ Single source of truth for all solvers
-- ✅ Easy solver discovery
-- ✅ Metadata management
-- ✅ Best solver selection logic
+
+-   ✅ Single source of truth for all solvers
+-   ✅ Easy solver discovery
+-   ✅ Metadata management
+-   ✅ Best solver selection logic
 
 ### 1.3 Create Custom Exceptions
 
@@ -471,6 +486,7 @@ class BuildError(STSException):
 **Goal:** Break down 680-line `main.py` into focused, maintainable modules
 
 **New Structure:**
+
 ```
 sts_solver/cli/
 ├── __init__.py              # Exports main cli() function
@@ -575,59 +591,60 @@ def solve(
     name: Optional[str]
 ):
     """Solve STS instance with N teams using specified approach"""
-    
+
     # Validate instance
     try:
         validate_instance_size(n)
     except InvalidInstanceError as e:
         click.echo(f"Error: {e}", err=True)
         return 1
-    
+
     # Setup output directory
     output_dir = Path(output) if output else Path("res") / approach
-    
+
     # Display info
     click.echo(f"Solving STS instance with {n} teams using {approach} approach")
     if solver:
         click.echo(f"Using solver: {solver}")
-    
+
     # Get solver class
     solver_name = solver or registry.find_best_solver(approach, n, optimization)
     if not solver_name:
         click.echo(f"Error: No suitable solver found for {approach}", err=True)
         return 1
-    
+
     solver_cls = registry.get_solver(approach, solver_name)
     if not solver_cls:
         click.echo(f"Error: Solver '{solver_name}' not found", err=True)
         return 1
-    
+
     # Solve
     start_time = time.time()
     try:
         solver_instance = solver_cls(n, timeout, optimization)
         result = solver_instance.solve()
-        
+
         # Save results
         result_name = name or solver_name
         results = {result_name: result}
         save_results(n, approach, results, output_dir)
-        
+
         click.echo(f"Solution completed in {time.time() - start_time:.2f}s")
         click.echo(f"Results saved to {output_dir / f'{n}.json'}")
-        
+
         return 0
-        
+
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         return 1
 ```
 
 **Benefits:**
-- ✅ Each command is self-contained (~50-100 lines)
-- ✅ Easy to test individual commands
-- ✅ Clear separation of concerns
-- ✅ Easier to add new commands
+
+-   ✅ Each command is self-contained (~50-100 lines)
+-   ✅ Easy to test individual commands
+-   ✅ Clear separation of concerns
+-   ✅ Easier to add new commands
 
 ---
 
@@ -638,6 +655,7 @@ def solve(
 **Current Issue:** 9 different MIP implementations with lots of duplication
 
 **Strategy:**
+
 1. Create `MIPBaseSolver` extending `BaseSolver`
 2. Extract common MIP patterns (variable creation, constraints)
 3. Use strategy pattern for formulations
@@ -657,10 +675,10 @@ from ..base_solver import BaseSolver, SolverMetadata
 class MIPBaseSolver(BaseSolver):
     """
     Base class for all MIP solvers.
-    
+
     Provides common functionality for Mixed-Integer Programming approaches.
     """
-    
+
     def __init__(
         self,
         n: int,
@@ -672,22 +690,22 @@ class MIPBaseSolver(BaseSolver):
         self.backend = backend
         self.weeks = n - 1
         self.periods = n // 2
-    
+
     @abstractmethod
     def _create_variables(self, model: Any) -> dict:
         """Create decision variables for the model"""
         pass
-    
+
     @abstractmethod
     def _add_constraints(self, model: Any, variables: dict) -> None:
         """Add problem constraints to the model"""
         pass
-    
+
     def _add_common_constraints(self, model: Any, variables: dict) -> None:
         """Add constraints common to all MIP formulations"""
         # Implementation of common constraints
         pass
-    
+
     def _extract_solution(
         self,
         model: Any,
@@ -712,33 +730,33 @@ from ...registry import registry
 @registry.register('MIP', 'compact-scip')
 class CompactSCIPSolver(MIPBaseSolver):
     """Compact MIP formulation using SCIP backend"""
-    
+
     def __init__(self, n: int, timeout: int = 300, optimization: bool = False):
         super().__init__(n, 'SCIP', timeout, optimization)
-    
+
     def _build_model(self):
         # Use parent's common functionality
         model = self._create_ortools_model()
         variables = self._create_variables(model)
         self._add_constraints(model, variables)
         return (model, variables)
-    
+
     def _create_variables(self, model):
         """Create schedule-based variables (compact formulation)"""
         # Compact formulation specific variables
         # ...
-    
+
     def _add_constraints(self, model, variables):
         """Add compact formulation constraints"""
         self._add_common_constraints(model, variables)
         # Add compact-specific constraints
         # ...
-    
+
     def _solve_model(self, model_data):
         model, variables = model_data
         # Solve using SCIP
         # ...
-    
+
     @classmethod
     def get_metadata(cls) -> SolverMetadata:
         return SolverMetadata(
@@ -770,7 +788,7 @@ from ..base_solver import BaseSolver
 
 class SMTBaseSolver(BaseSolver):
     """Base class for all SMT solvers"""
-    
+
     def __init__(
         self,
         n: int,
@@ -782,14 +800,14 @@ class SMTBaseSolver(BaseSolver):
         self.use_tactics = use_tactics
         self.weeks = n - 1
         self.periods = n // 2
-    
+
     def _build_model(self):
         """Build Z3 solver with constraints"""
         solver = self._create_solver()
         variables = self._create_variables()
         self._add_constraints(solver, variables)
         return (solver, variables)
-    
+
     def _create_solver(self):
         """Create Z3 solver with appropriate configuration"""
         if self.use_tactics:
@@ -798,17 +816,17 @@ class SMTBaseSolver(BaseSolver):
             solver = Solver()
             solver.set("timeout", self.timeout * 1000)
             return solver
-    
+
     @abstractmethod
     def _create_variables(self):
         """Create Z3 variables"""
         pass
-    
-    @abstractmethod  
+
+    @abstractmethod
     def _add_constraints(self, solver, variables):
         """Add SMT constraints"""
         pass
-    
+
     def _create_tactical_solver(self):
         """Create solver with tactics for better performance"""
         # Common tactical configuration
@@ -829,6 +847,7 @@ For each solver implementation:
 ⏳ Write unit tests (scheduled Phase 5)
 
 **Priority Order (Updated):**
+
 1. Complete SMT presolve family migration
 2. Remaining MIP delegates (match, flow, pulp, presolve)
 3. SAT function-based solvers → class-based
@@ -864,54 +883,54 @@ class SolverConfig:
 class Config:
     """
     Global configuration for STS solver.
-    
+
     Can be loaded from file or environment variables.
     """
-    
+
     # Directories
     results_dir: Path = Path("res")
     docs_dir: Path = Path("docs")
-    
+
     # Default settings
     default_timeout: int = 300
     default_approach: str = "CP"
-    
+
     # Solver configurations
     solver_configs: Dict[str, SolverConfig] = field(default_factory=dict)
-    
+
     # Benchmark settings
     benchmark_instances: List[int] = field(default_factory=lambda: list(range(4, 21, 2)))
     benchmark_timeout: int = 300
-    
+
     # Validation settings
     validate_solutions: bool = True
     official_checker_path: Optional[Path] = None
-    
+
     # Logging
     log_level: str = "INFO"
     log_file: Optional[Path] = None
-    
+
     @classmethod
     def from_file(cls, path: Path) -> 'Config':
         """Load configuration from JSON file"""
         with open(path) as f:
             data = json.load(f)
         return cls(**data)
-    
+
     @classmethod
     def from_env(cls) -> 'Config':
         """Load configuration from environment variables"""
         import os
         config = cls()
-        
+
         if timeout := os.getenv('STS_DEFAULT_TIMEOUT'):
             config.default_timeout = int(timeout)
-        
+
         if results_dir := os.getenv('STS_RESULTS_DIR'):
             config.results_dir = Path(results_dir)
-        
+
         return config
-    
+
     def save(self, path: Path) -> None:
         """Save configuration to file"""
         data = {
@@ -921,7 +940,7 @@ class Config:
         }
         with open(path, 'w') as f:
             json.dump(data, f, indent=2)
-    
+
     def get_solver_config(self, solver_name: str) -> Optional[SolverConfig]:
         """Get configuration for specific solver"""
         return self.solver_configs.get(solver_name)
@@ -940,7 +959,7 @@ def get_config() -> Config:
             Path('sts_config.json'),
             Path.home() / '.sts_config.json',
         ]
-        
+
         for path in config_paths:
             if path.exists():
                 _config = Config.from_file(path)
@@ -948,7 +967,7 @@ def get_config() -> Config:
         else:
             # Load from environment or use defaults
             _config = Config.from_env()
-    
+
     return _config
 
 
@@ -985,7 +1004,7 @@ def handle_solver_errors(
 ):
     """
     Context manager for consistent solver error handling.
-    
+
     Usage:
         with handle_solver_errors('SCIP', 12, 300):
             result = solver.solve()
@@ -1010,7 +1029,7 @@ def retry_on_failure(
 ):
     """
     Decorator for retrying failed operations.
-    
+
     Usage:
         @retry_on_failure(max_attempts=3)
         def unstable_operation():
@@ -1019,7 +1038,7 @@ def retry_on_failure(
     def decorator(func: Callable):
         def wrapper(*args, **kwargs):
             import time
-            
+
             for attempt in range(max_attempts):
                 try:
                     return func(*args, **kwargs)
@@ -1028,7 +1047,7 @@ def retry_on_failure(
                         raise
                     logger.warning(f"Attempt {attempt + 1} failed: {e}")
                     time.sleep(delay)
-        
+
         return wrapper
     return decorator
 ```
@@ -1040,6 +1059,7 @@ def retry_on_failure(
 ### 5.1 Testing Infrastructure
 
 **New Structure:**
+
 ```
 tests/
 ├── __init__.py
@@ -1074,13 +1094,13 @@ from sts_solver.utils.solution_format import STSSolution
 
 class DummySolver(BaseSolver):
     """Dummy solver for testing"""
-    
+
     def _build_model(self):
         return None
-    
+
     def _solve_model(self, model):
         return STSSolution(time=1, optimal=True, obj=None, sol=[])
-    
+
     @classmethod
     def get_metadata(cls):
         return SolverMetadata(
@@ -1092,30 +1112,30 @@ class DummySolver(BaseSolver):
 
 class TestBaseSolver:
     """Tests for BaseSolver"""
-    
+
     def test_valid_instance(self):
         """Test solver with valid parameters"""
         solver = DummySolver(n=6, timeout=10)
         assert solver.n == 6
         assert solver.timeout == 10
-    
+
     def test_odd_teams_raises_error(self):
         """Test that odd number of teams raises error"""
         with pytest.raises(InvalidInstanceError):
             DummySolver(n=5)
-    
+
     def test_too_few_teams_raises_error(self):
         """Test that too few teams raises error"""
         with pytest.raises(InvalidInstanceError):
             DummySolver(n=2)
-    
+
     def test_solve_returns_solution(self):
         """Test that solve() returns a solution"""
         solver = DummySolver(n=6)
         result = solver.solve()
         assert isinstance(result, STSSolution)
         assert result.time >= 0
-    
+
     def test_elapsed_time(self):
         """Test elapsed time tracking"""
         solver = DummySolver(n=6)
@@ -1131,25 +1151,25 @@ class TestBaseSolver:
 def function_name(param1: Type1, param2: Type2) -> ReturnType:
     """
     Short one-line description.
-    
+
     Longer description explaining the function's purpose,
     behavior, and any important details.
-    
+
     Args:
         param1: Description of param1
         param2: Description of param2
-    
+
     Returns:
         Description of return value
-    
+
     Raises:
         ExceptionType: When this exception is raised
-    
+
     Example:
         >>> result = function_name(value1, value2)
         >>> print(result)
         expected_output
-    
+
     Note:
         Additional notes or warnings
     """
@@ -1162,60 +1182,68 @@ def function_name(param1: Type1, param2: Type2) -> ReturnType:
 ### Week 1: Foundation & CLI
 
 **Day 1-2: Foundation**
-- [ ] Create `base_solver.py` with `BaseSolver` class
-- [ ] Create unified `registry.py`
-- [ ] Create `exceptions.py`
-- [ ] Update `__init__.py` files to export new classes
-- [ ] Write unit tests for foundation classes
+
+-   [ ] Create `base_solver.py` with `BaseSolver` class
+-   [ ] Create unified `registry.py`
+-   [ ] Create `exceptions.py`
+-   [ ] Update `__init__.py` files to export new classes
+-   [ ] Write unit tests for foundation classes
 
 **Day 3: CLI Restructuring**
-- [ ] Create new `cli/` directory structure
-- [ ] Split `main.py` into command modules
-- [ ] Update imports throughout project
-- [ ] Test all CLI commands
+
+-   [ ] Create new `cli/` directory structure
+-   [ ] Split `main.py` into command modules
+-   [ ] Update imports throughout project
+-   [ ] Test all CLI commands
 
 ### Week 2+: Solver Unification (Rolling)
 
-**Completed:** MIP (standard, compact, optimized); SMT (baseline, optimized, compact)
+**Completed:** MIP (standard, compact, optimized); SMT (baseline, optimized, compact, presolve family); SAT (baseline, pairwise)
 
 **Next Sprint Focus:**
-1. SMT presolve variants → class-based
-2. Benchmark parity checks post-migration
-3. Start SAT migration scaffolding
-- [ ] Create `MIPBaseSolver` base class
-- [ ] Refactor `ortools_solver.py` to use base class
-- [ ] Refactor compact formulations
-- [ ] Refactor optimized formulations
-- [ ] Update all MIP solvers to register with unified registry
-- [ ] Write tests for MIP solvers
+
+1. Benchmark parity checks post-migration across all approaches
+2. Begin CP migration feasibility study
+3. Introduce initial unit test suite (Phase 5 kickoff)
+
+-   [ ] Create `MIPBaseSolver` base class
+-   [ ] Refactor `ortools_solver.py` to use base class
+-   [ ] Refactor compact formulations
+-   [ ] Refactor optimized formulations
+-   [ ] Update all MIP solvers to register with unified registry
+-   [ ] Write tests for MIP solvers
 
 **Day 6: SMT/SAT Refactoring**
-- [ ] Create `SMTBaseSolver` base class
-- [ ] Refactor SMT solvers
-- [ ] Refactor SAT solvers
-- [ ] Register all with unified registry
-- [ ] Write tests
+
+-   [ ] Create `SMTBaseSolver` base class
+-   [ ] Refactor SMT solvers
+-   [ ] Refactor SAT solvers
+-   [ ] Register all with unified registry
+-   [ ] Write tests
 
 ### Week 3: Configuration & Polish
 
 **Day 7: Configuration & Error Handling**
-- [ ] Implement configuration system
-- [ ] Add error handling utilities
-- [ ] Update all solvers to use new error handling
-- [ ] Add logging throughout
+
+-   [ ] Implement configuration system
+-   [ ] Add error handling utilities
+-   [ ] Update all solvers to use new error handling
+-   [ ] Add logging throughout
 
 **Day 8-9: Testing & Documentation**
-- [ ] Write comprehensive unit tests (target 70%+ coverage)
-- [ ] Write integration tests
-- [ ] Add docstrings to all public functions
-- [ ] Update README.md
-- [ ] Create migration guide
+
+-   [ ] Write comprehensive unit tests (target 70%+ coverage)
+-   [ ] Write integration tests
+-   [ ] Add docstrings to all public functions
+-   [ ] Update README.md
+-   [ ] Create migration guide
 
 **Day 10: Final Review**
-- [ ] Code review
-- [ ] Performance testing
-- [ ] Update CHANGELOG.md
-- [ ] Create release notes
+
+-   [ ] Code review
+-   [ ] Performance testing
+-   [ ] Update CHANGELOG.md
+-   [ ] Create release notes
 
 ---
 
@@ -1258,26 +1286,30 @@ def solve_mip_old_function(n, solver):
 ## Risk Assessment
 
 ### Low Risk Changes ✅
-- Adding new base classes
-- Creating new utility modules
-- Adding documentation
-- Adding tests
+
+-   Adding new base classes
+-   Creating new utility modules
+-   Adding documentation
+-   Adding tests
 
 ### Medium Risk Changes ⚠️
-- Splitting CLI into modules
-- Refactoring individual solver implementations
-- Changing import paths
+
+-   Splitting CLI into modules
+-   Refactoring individual solver implementations
+-   Changing import paths
 
 ### High Risk Changes 🔴
-- Removing old code
-- Changing public APIs
-- Major restructuring
+
+-   Removing old code
+-   Changing public APIs
+-   Major restructuring
 
 **Mitigation:**
-- Create feature branches
-- Review all changes
-- Maintain test coverage
-- Document breaking changes
+
+-   Create feature branches
+-   Review all changes
+-   Maintain test coverage
+-   Document breaking changes
 
 ---
 
@@ -1285,31 +1317,31 @@ def solve_mip_old_function(n, solver):
 
 ### Code Quality Metrics
 
-- [ ] Main CLI file < 200 lines
-- [ ] No function > 50 lines
-- [ ] No file > 500 lines
-- [ ] Code duplication < 10%
-- [ ] Test coverage > 70%
-- [ ] All public functions have docstrings
-- [ ] All public functions have type hints
-- [ ] No pylint warnings
+-   [ ] Main CLI file < 200 lines
+-   [ ] No function > 50 lines
+-   [ ] No file > 500 lines
+-   [ ] Code duplication < 10%
+-   [ ] Test coverage > 70%
+-   [ ] All public functions have docstrings
+-   [ ] All public functions have type hints
+-   [ ] No pylint warnings
 
 ### Functional Requirements
 
-- [ ] All existing tests pass
-- [ ] All CLI commands work
-- [ ] All solvers produce correct solutions
-- [ ] Performance not degraded
-- [ ] Backward compatibility maintained (with deprecation warnings)
+-   [ ] All existing tests pass
+-   [ ] All CLI commands work
+-   [ ] All solvers produce correct solutions
+-   [ ] Performance not degraded
+-   [ ] Backward compatibility maintained (with deprecation warnings)
 
 ### Documentation
 
-- [ ] All modules have module docstrings
-- [ ] All classes have class docstrings
-- [ ] All public functions have docstrings
-- [ ] README.md updated
-- [ ] Migration guide created
-- [ ] API reference generated
+-   [ ] All modules have module docstrings
+-   [ ] All classes have class docstrings
+-   [ ] All public functions have docstrings
+-   [ ] README.md updated
+-   [ ] Migration guide created
+-   [ ] API reference generated
 
 ---
 
@@ -1318,11 +1350,12 @@ def solve_mip_old_function(n, solver):
 ### Monitoring
 
 During refactoring, monitor:
-- Test pass rate
-- Performance benchmarks
-- Code coverage
-- Import errors
-- Deprecation warnings
+
+-   Test pass rate
+-   Performance benchmarks
+-   Code coverage
+-   Import errors
+-   Deprecation warnings
 
 ### Rollback Plan
 
@@ -1333,11 +1366,12 @@ If issues arise:
 3. **Critical issues:** Emergency rollback to tagged release
 
 Keep these git tags during migration:
-- `pre-refactor-baseline` - Before refactoring starts
-- `phase-1-complete` - After foundation phase
-- `phase-2-complete` - After CLI restructuring
-- `phase-3-complete` - After solver unification
-- `refactor-complete` - After all phases done
+
+-   `pre-refactor-baseline` - Before refactoring starts
+-   `phase-1-complete` - After foundation phase
+-   `phase-2-complete` - After CLI restructuring
+-   `phase-3-complete` - After solver unification
+-   `refactor-complete` - After all phases done
 
 ---
 
@@ -1346,19 +1380,21 @@ Keep these git tags during migration:
 ### Maintenance
 
 After refactoring:
-- Update CI/CD pipelines
-- Update documentation
-- Train team on new structure
-- Archive old documentation
+
+-   Update CI/CD pipelines
+-   Update documentation
+-   Train team on new structure
+-   Archive old documentation
 
 ### Future Improvements
 
 Consider for future iterations:
-- Add more solver backends (Gurobi, CPLEX Pro features)
-- Implement parallel solving
-- Add web UI for results visualization
-- Create solver comparison dashboard
-- Add automated performance regression testing
+
+-   Add more solver backends (Gurobi, CPLEX Pro features)
+-   Implement parallel solving
+-   Add web UI for results visualization
+-   Create solver comparison dashboard
+-   Add automated performance regression testing
 
 ---
 
@@ -1367,11 +1403,12 @@ Consider for future iterations:
 This refactoring plan provides a systematic approach to improving the CDMO project's codebase. By following the phased approach and maintaining backward compatibility, we can significantly improve code quality while minimizing risk.
 
 **Key Benefits:**
-- 🎯 **Reduced Complexity** - Smaller, focused modules
-- ♻️ **Less Duplication** - Shared base classes and utilities
-- 🧪 **Better Testability** - Clear interfaces and dependencies
-- 📚 **Improved Documentation** - Consistent docstrings
-- 🔧 **Easier Maintenance** - Logical organization and patterns
+
+-   🎯 **Reduced Complexity** - Smaller, focused modules
+-   ♻️ **Less Duplication** - Shared base classes and utilities
+-   🧪 **Better Testability** - Clear interfaces and dependencies
+-   📚 **Improved Documentation** - Consistent docstrings
+-   🔧 **Easier Maintenance** - Logical organization and patterns
 
 **Estimated Timeline:** 2-3 weeks
 **Estimated Effort:** 60-80 hours
@@ -1379,6 +1416,6 @@ This refactoring plan provides a systematic approach to improving the CDMO proje
 
 ---
 
-*Last Updated: 2025-11-08*
-*Author: Refactoring Team*
-*Version: 1.0*
+_Last Updated: 2025-11-15_
+_Author: Refactoring Team_
+_Version: 1.0_

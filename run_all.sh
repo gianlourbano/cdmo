@@ -27,7 +27,7 @@ echo "This will test multiple formulations for each approach."
 echo ""
 
 # Run comprehensive benchmark
-if timeout $((TIMEOUT * 100)) uv run sts-solve comprehensive-benchmark $MAX_TEAMS --timeout $TIMEOUT; then
+if timeout $((TIMEOUT * 100)) uv run sts comprehensive-benchmark $MAX_TEAMS --timeout $TIMEOUT; then
     echo ""
     echo "✓ Comprehensive benchmark completed successfully"
 else
@@ -57,12 +57,12 @@ echo "======================================"
 # Run comprehensive analysis
 if command -v uv >/dev/null 2>&1; then
     echo "📊 Generating benchmark analysis report..."
-    uv run sts-solve analyze --format console
+    uv run sts analyze --format console
     
     echo ""
     echo "📈 Exporting results for further analysis..."
-    uv run sts-solve analyze --format json
-    uv run sts-solve analyze --format csv
+    uv run sts analyze --format json
+    uv run sts analyze --format csv
     
     echo ""
     echo "✅ Analysis complete!"
@@ -71,6 +71,6 @@ if command -v uv >/dev/null 2>&1; then
     echo "  - CSV data: res/benchmark_summary.csv"
 else
     echo "To run analysis manually:"
-    echo "  uv run sts-solve analyze --format console"
-    echo "  uv run sts-solve validate-results"
+    echo "  uv run sts analyze --format console"
+    echo "  uv run sts validate-results"
 fi

@@ -9,6 +9,7 @@ import time
 from typing import Optional, List
 
 from .utils.solution_format import save_results, STSSolution
+from .registry import registry
 
 
 @click.group()
@@ -45,26 +46,32 @@ def solve(n: int, approach: str, solver: Optional[str], timeout: int, output: Op
     
     start_time = time.time()
     
-    # Import and run the appropriate solver
+    # Ensure class-based registrations
     try:
-        if approach == "CP":
-            from .cp.solver import solve_cp
-            result = solve_cp(n, solver, timeout, optimization)
-        elif approach == "SAT":
-            from .sat.solver import solve_sat
-            result = solve_sat(n, solver, timeout, optimization)
-        elif approach == "SMT":
-            from .smt.solver import solve_smt
-            result = solve_smt(n, solver, timeout, optimization)
-        elif approach == "MIP":
-            from .mip.solver import solve_mip
-            result = solve_mip(n, solver, timeout, optimization)
-        else:
-            click.echo(f"Error: Unknown approach {approach}", err=True)
-            return
-            
+        import sts_solver.cp.unified_bridge    # noqa: F401
+        import sts_solver.sat.unified_bridge   # noqa: F401
+        import sts_solver.smt.unified_bridge   # noqa: F401
+        import sts_solver.mip.unified_bridge   # noqa: F401
+    except Exception as e:
+        click.echo(f"Error loading solver registry: {e}", err=True)
+        return
+
+    # Determine solver name (fallback to best solver from registry)
+    chosen = solver or registry.find_best_solver(approach, n, optimization)
+    if not chosen:
+        click.echo(f"Error: No suitable solver found for {approach}", err=True)
+        return
+
+    solver_cls = registry.get_solver(approach, chosen)
+    if not solver_cls:
+        click.echo(f"Error: Solver '{chosen}' not registered for {approach}", err=True)
+        return
+
+    try:
+        instance = solver_cls(n, timeout, optimization)
+        result = instance.solve()
         # Save results with custom name or solver name
-        result_name = name or solver or "default"
+        result_name = name or chosen
         results = {result_name: result}
         save_results(n, approach, results, output_dir)
         
@@ -72,7 +79,7 @@ def solve(n: int, approach: str, solver: Optional[str], timeout: int, output: Op
         click.echo(f"Results saved to {output_dir / f'{n}.json'}")
         
     except ImportError as e:
-        click.echo(f"Error: Solver not implemented yet: {e}", err=True)
+        click.echo(f"Error: Solver import issue: {e}", err=True)
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
 
