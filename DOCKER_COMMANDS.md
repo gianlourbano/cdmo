@@ -489,18 +489,3 @@ docker run --rm -v $(pwd)/res:/app/res sts-solver \
 docker run --rm -v $(pwd)/res:/app/res sts-solver \
     uv run sts analyze
 ```
-
----
-
-## Additional Resources
-
-- **README.md**: General project documentation
-- **docs/spec.md**: Official project specification
-- **SOLUTION_FORMAT_COMPLIANCE.md**: Solution format details
-- **REFACTOR_STATUS.md**: Code architecture documentation
-
----
-
-**Last Updated:** 2025-11-24  
-**Docker Image Version:** Latest  
-**CLI Version:** `sts` (unified command-line interface)

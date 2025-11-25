@@ -1,0 +1,147 @@
+\documentclass{article}
+\usepackage{amsmath, amssymb}
+\usepackage{algorithm, algorithmic}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{xcolor}
+
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue, citecolor=blue}
+
+% Macros (mathematical, no layout changes)
+\newcommand{\Teams}{\ensuremath{n}} % number of teams (even)
+\newcommand{\Weeks}{\ensuremath{n-1}}
+\newcommand{\Periods}{\ensuremath{n/2}}
+\newcommand{\PairSet}{\ensuremath{\{(i,j)\mid 1\le i<j\le n\}}}
+\newcommand{\Imax}{\ensuremath{\mathcal{I}_{\max}}}
+\newcommand{\Dsum}{\ensuremath{\mathcal{D}_{\Sigma}}}
+
+% Title (replace placeholders appropriately)
+\title{Project Title: Scheduling Optimization Approaches}
+\author{Gianlorenzo Urbano (gianlorenzo.urbano@studio.unibo.it)\\Luca Lucioli (luca.lucioli@studio.unibo.it)\\Michelangelo Urbano (michelangelo.urbano@studio.unibo.it)}
+\date{\today}
+
+\begin{document}\maketitle
+
+% =============================================================
+\section{Introduction (Common Elements)}
+We consider a round-robin tournament with $\Teams$ even, $\Weeks = \Teams-1$ weeks, and $\Periods = \Teams/2$ simultaneous periods each week. Each unordered pair $(i,j)\in\PairSet$ must be scheduled exactly once; the oriented match $(h,a)$ records a home team $h$ and an away team $a$.
+
+\paragraph{Canonical Week Decomposition (Circle Method).} Let the pivot team be $\Teams$ and the remaining teams form a cyclic array $C=(1,2,\dots,\Teams-1)$. For week $w\in\{0,\dots,\Weeks-1\}$ define the matching set
+\begin{equation}
+M_w = \{(\Teams, C_w)\} \cup \Big\{(\min(C_{w+k}, C_{w-k}),\max(C_{w+k}, C_{w-k})) : k=1,\dots,\tfrac{\Teams}{2}-1 \Big\},
+\end{equation}
+where indices are taken modulo $(\Teams-1)$. This yields a partition $(M_0,\dots,M_{\Weeks-1})$ of $\PairSet$ and fixes the week of every pair. The remaining decisions are: period assignment $p_{i,j}\in\{1,\dots,\Periods\}$ and orientation $o_{i,j}\in\{0,1\}$ (e.g. $o_{i,j}=1$ iff $i$ is home).
+
+\paragraph{Shared Structural Constraints.} For all pairs $(i,j)$ with $i<j$ and weeks $w$ and periods $p$:
+\begin{itemize}
+	\item \textit{Pair uniqueness}: each $(i,j)$ appears exactly once overall (enforced implicitly by the partition $M_w$ above).
+	\item \textit{Weekly participation}: $\forall i$ and $\forall w$: $i$ occurs in exactly one match of $M_w$.
+	\item \textit{Slot occupancy}: for each $w$ and $p$, exactly one pair with week $w$ is assigned period $p$.
+	\item \textit{Period appearance cap}: $\forall i,\forall p$: $\sum_{w} [p_{i,j}=p \text{ for the unique } (i,j)\in M_w \text{ containing } i] \le 2$.
+\end{itemize}
+
+\paragraph{Symmetries and Their Breaking.} The canonical week decomposition removes rotational symmetry of weeks (cyclic shifts of the schedule). Residual symmetries common to our strongest formulations are:
+\begin{itemize}
+	\item \textit{Within-week period permutation}: simultaneous relabeling $p\mapsto \pi(p)$ for a permutation $\pi$ leaves feasibility unchanged. Broken by fixing an order on a distinguished subset of pairs in week $0$, e.g. $p_{\Teams, C_0}=1 < p_{a_1,b_1} < p_{a_2,b_2} < \dots$.
+	\item \textit{Global home/away flip} per pair: for any subset $S\subseteq \PairSet$, replacing $(o_{i,j})$ by $(1-o_{i,j})$ preserves structural constraints. Broken by anchoring orientations of a small seed set, e.g. $o_{\Teams, C_0}=1$ and $o_{1,j}=1$ for $j\in\{2,3\}$.
+	\item \textit{Reflection of the circle}: mapping indices $k\mapsto (\Teams-1)-k$ induces $M_w \leftrightarrow M_{-w}$; already eliminated by fixing the explicit $M_w$ construction and ordering constraints on $p_{i,j}$ in $M_0$.
+\end{itemize}
+
+\paragraph{Formal Symmetry-Breaking Constraints.} Let $F_0= M_0 = \{(\Teams,C_0),(a_1,b_1),\dots,(a_{m},b_{m})\}$ with $m=\tfrac{\Teams}{2}-1$. We enforce a strictly increasing (or relaxed increasing) ordering
+\begin{equation}\label{eq:period-order}
+ p_{\Teams,C_0} < p_{a_1,b_1} < p_{a_2,b_2} < \dots < p_{a_m,b_m},
+\end{equation}
+which selects a unique representative of the orbit under permutations $\pi\in S_{\Periods}$ acting on period labels within week $0$. Orientation anchoring fixes a balanced prefix/suffix pattern:
+\begin{equation}\label{eq:home-anchor}
+ o_{1,j}=1 \;\text{for}\; j\in\{2,\dots,\tfrac{\Teams}{2}\},\quad o_{1,j}=0 \;\text{for}\; j\in\{\tfrac{\Teams}{2}+1,\dots,\Teams-1\},
+\end{equation}
+breaking the global involution $o_{i,j}\mapsto 1-o_{i,j}$ and reducing symmetric home/away distributions.
+
+\paragraph{Implicit Distribution (Deficiency Pattern).} Define cumulative period occurrences
+\begin{equation}
+ \operatorname{occ}_{t,p} = \sum_{j\ne t} [p_{t,j}=p], \qquad t\in\{1,\dots,\Teams\},\; p\in\{1,\dots,\Periods\}.
+\end{equation}
+Under (i) pair uniqueness, (ii) weekly participation, (iii) slot occupancy and (iv) per-period cap $\operatorname{occ}_{t,p}\le 2$, the multiset $\{\operatorname{occ}_{t,p}: t\}$ for any fixed $p$ must contain exactly $2$ ones and $\Teams-2$ twos. Indeed, total appearances in period $p$ equal number of weeks $=\Weeks=\Teams-1$ and with each team contributing either $1$ or $2$ appearances (cap), the only feasible composition solving
+\begin{equation}
+ \sum_{t} \operatorname{occ}_{t,p} = \Teams -1, \quad \operatorname{occ}_{t,p}\in\{1,2\}
+\end{equation}
+is $2\cdot 1 + (\Teams-2)\cdot 2 = \Teams -1$. Marking deficiency via $d_{t,p}=[\operatorname{occ}_{t,p}=1]$, constraints
+\begin{equation}\label{eq:deficiency}
+ \sum_{t} d_{t,p}=2, \qquad \sum_{p} d_{t,p}\le 1
+\end{equation}
+capture that each team can be deficient in at most one period. These are implied by structural constraints and prune assignments failing the forced global distribution early.
+
+\paragraph{Effect.} Constraints (\ref{eq:period-order})--(\ref{eq:deficiency}) eliminate factorial period permutations, orientation complements and circle reflections while enforcing the unique deficiency pattern, drastically shrinking the search space without altering the feasible solution set.
+
+\paragraph{Fairness Objectives.} Let $H_i=\sum_{(i,j)} o_{i,j}$ and $A_i=\sum_{(j,i)} (1-o_{j,i})$ counting home and away appearances (after normalizing orientation per unordered pair). Two objective metrics are shared: minimax imbalance $\Imax = \max_i |H_i-A_i|$ and aggregate deviation $\Dsum=\sum_i |H_i-A_i|$. Bounds follow from $H_i+A_i=\Weeks$: $0\le \Imax \le \Weeks$ and $0\le \Dsum \le \Teams\,\Weeks$.
+
+\paragraph{Preprocessing Impact.} Fixing weeks via $(M_w)$ collapses the decision space from ordering both weeks and periods to ordering periods only; symmetry breaking acts then chiefly on period permutations and small orientation flips, dramatically reducing equivalent search states in every formulation without referencing modeling specifics.
+
+% =============================================================
+\section{CP Model}
+\subsection{Decision Variables}
+Example: $\text{period}_{i,j}\in\{1,\dots,\Periods\}$ for $(i,j)\in\PairSet$, and $\text{home}_{i,j}\in\{0,1\}$ (1 iff $i$ is home). Domains are finite and integral.
+\subsection{Objective Function}
+If optimization enabled, minimize $\Imax$ via auxiliary variables $d_i\ge |H_i-A_i|$ and $I\ge d_i$ for all $i$, objective $\min I$. Bounds described in Section 1.
+\subsection{Constraints}
+Main constraints instantiate uniqueness, weekly participation, slot occupancy and period cap using global constraints (e.g., counting constraints over $\text{period}_{i,j}$). Orientation does not affect feasibility.\newline
+Implied constraints: fix ordering for a reference week to eliminate rotational symmetry of weeks.\newline
+Symmetry breaking: impose lexicographic ordering on $(\text{period}_{i,j})$ for a subset of pairs with common team to reduce equivalent permutations.
+\subsection{Validation}
+\paragraph{Experimental Design.} Backend: MiniZinc with Gecode (mandatory) and Chuffed (optional). Time limit $T$ seconds per instance. Instances: $n\in\{4,6,8,10,12,14,16\}$.\newline
+\paragraph{Experimental Results.} Table template (runtime seconds or objective values; UNSAT / N/A markers):
+\begin{center}
+\begin{tabular}{lcccc}\toprule
+Instance & Gecode+SB & Gecode & Chuffed+SB & Chuffed\\\midrule
+4 & 0.01 & 0.01 & 0.01 & 0.01\\
+6 & 0.05 & 0.07 & 0.04 & 0.05\\
+\vdots & & & & \\\bottomrule
+\end{tabular}
+\end{center}
+
+% =============================================================
+\section{SAT Model}
+\subsection{Decision Variables}
+Boolean literals $x_{i,j,w,p}$ (true iff oriented match $(i\text{ home},j\text{ away})$ is scheduled at $(w,p)$) and $o_{i,j}$ for orientation if factored. Domains: \{$0,1$\}.
+\subsection{Objective Function}
+Aggregate deviation $\Dsum$ encoded via cardinality constraints or successive SAT solves with bound tightening; or minimax imbalance by binary search on $I$ and additional clauses enforcing $|H_i-A_i|\le I$.
+\subsection{Constraints}
+Clauses enforce: (i) exactly one week-period per unordered pair (pair expansion); (ii) per-week exactly one occurrence per team (at-most-one with pairwise or sequential encoding plus at-least-one); (iii) slot uniqueness (exactly-one over all pairs oriented); (iv) period cap (at-most-two per team per period across weeks). Implied and symmetry breaking as in Section 2 using unit clauses fixing reference assignments.
+\subsection{Validation}
+Backend: Z3 (mandatory). Instances and limits as in CP section. Record runtime / best objective. Provide comparison table analogous to Section 2.
+
+% =============================================================
+\section{SMT Model}
+\subsection{Decision Variables}
+Integer variables $p_{i,j}\in\{1,\dots,\Periods\}$ for period, fixed week from preprocessing, and optional Boolean $h_{i,j}$ for orientation. Additional $d_i$ and $I$ for minimax objective.
+\subsection{Objective Function}
+Minimize $I$ with constraints $d_i\ge H_i-A_i$, $d_i\ge A_i-H_i$, $I\ge d_i$.
+\subsection{Constraints}
+Cardinality constraints enforce exactly-one per period slot in each week; at-most-two period appearances aggregated via pseudo-Boolean inequalities; first-week symmetry broken by fixed period ordering.
+\subsection{Validation}
+Backends: Z3 or CVC5. Same instance set; measure time and objective; reproduce tables.
+
+% =============================================================
+\section{MIP Model}
+\subsection{Decision Variables}
+Binary $x_{i,j,w,p}$, $i\neq j$, for oriented placement; or reduced forms using preassigned weeks and only periods/orientation (presolve variant).
+\subsection{Objective Function}
+Either $\min \sum_i d_i$ with linearization $d_i\ge H_i-A_i$, $d_i\ge A_i-H_i$; or minimax via $I\ge d_i$ and $\min I$.
+\subsection{Constraints}
+Linear equalities and inequalities for pair uniqueness, weekly participation, slot occupancy, and period cap. Symmetry breaking: fix selected slots (e.g. match $(1,2)$ at $(1,1)$) and impose ordering on early periods for team 1.
+\subsection{Validation}
+Backends: CBC, SCIP, others (optional). Record feasibility, objective, runtime. Provide comparative table analogous to CP.
+
+% =============================================================
+\section{Conclusions}
+We formalized a unified family of models sharing identical structural constraints and two fairness objectives; differences lie in variable encodings and constraint propagation strengths. Results guide backend selection under instance size and objective preferences.
+
+\section*{Authenticity and Author Contribution Statement (Excluded)}
+All work is original; any external ideas properly cited. AI assistance, where used, will be disclosed per section. Contributions: (placeholder summary for each author).
+
+\section*{References (Excluded)}
+% Replace with a bibliography environment or BibTeX.
+\begin{itemize}\item Placeholder reference list.\end{itemize}
+
+\end{document}

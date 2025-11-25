@@ -45,7 +45,8 @@ class SMTPresolve2NativeSolver(SMTBaseSolver):
                 solver = Then('card2bv', 'smt').solver()
             except Exception:
                 solver = Solver()
-        solver.set(timeout=self.timeout * 1000)
+        solver.set("timeout", self.timeout * 1000)
+        solver.set("random_seed", 69)
 
         p: Dict[Tuple[int, int, int], Any] = {}
         home: Dict[Tuple[int, int, int], Bool] = {}

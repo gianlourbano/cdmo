@@ -14,10 +14,10 @@ from .ortools_presolve import MIPPresolveSolver as _Presolve
 # Example: uv run sts solve 12 MIP --solver optimized-SCIP
 # Or use default backend (SCIP for most, CBC for standard)
 
-# @registry.register("MIP", "standard")
-# class MIPStandardSolver(_Std):
-#     """Standard MIP formulation (default backend: CBC)"""
-#     pass
+@registry.register("MIP", "standard")
+class MIPStandardSolver(_Std):
+    """Standard MIP formulation (default backend: CBC)"""
+    pass
 
 
 # @registry.register("MIP", "optimized")
