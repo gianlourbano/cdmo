@@ -1,0 +1,219 @@
+\documentclass{article}
+
+% PACKAGES
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}   % For mathematical formatting
+\usepackage{amssymb}   % For mathematical symbols
+\usepackage{booktabs}  % For professional looking tables
+\usepackage{hyperref}  % For email addresses
+\usepackage{geometry}  % Standard margins (default article margins are usually fine, but do not customize further)
+
+% INSTRUCTIONS (Read and remove before submission):
+% 1. Do not change fonts, font size, or margins.
+% 2. Page limit: 12 pages (3 approaches) or 15 pages (all approaches), excluding authenticity/refs.
+% 3. Use high-level mathematical language. Do NOT copy-paste code.
+% 4. Do not be verbose[cite: 3].
+
+\title{Project Title} % [cite: 1]
+
+% Alphabetical order, Name, Lastname, UniBo email [cite: 2]
+\author{Gianlorenzo Urbano (gianlorenzo.urbano@studio.unibo.it)\\Luca Lucioli (luca.lucioli@studio.unibo.it)\\Michelangelo Urbano (michelangelo.urbano@studio.unibo.it)}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+In this project, we address a specific variant of the Sports Tournament Scheduling (STS) problem by employing a decomposition strategy. Instead of solving the full problem monolithically, we utilize the \textit{Circle Method} (canonical 1-factorization) as a pre-processing step to statically fix the weekly schedule. This approach reduces the combinatorial complexity of the decision and optimization tasks for our solvers (CP, SAT, MIP, SMT) to two specific sub-problems: assigning the pre-determined matches to periods and determining the home/away status.
+The following sections detail the mathematical formalization common to all our models, the algorithmic details of the pre-processing, and the theoretical properties inherent to the problem structure.
+
+
+\subsection{Common Formalization}
+The following formalization is shared across all approaches.
+    \subsubsection{Input Parameters:}
+    \begin{itemize}
+        \item Number of teams $n$ (even) and the set of teams $\mathcal{T} = \{1, \dots, n\}$.
+        \item Number of weeks $n_{weeks} = n-1$ and the set of weeks $\mathcal{W} = \{1, \dots, n-1\}$.
+        \item Number of periods $n_{periods} = n/2$ and the set of periods $\mathcal{P} = \{1, \dots, n/2\}$.
+        \item The pre-computed match-week matrix $W$, where $W_{ij} \in \mathcal{W}$ denotes the week in which team $i$ plays team $j$.
+    \end{itemize}
+    \subsubsection{Decision Variables:}
+    \begin{itemize}
+        \item $\pi_{ij} \in \mathcal{P}$: The period assigned to the match between teams $i$ and $j$ ($i < j$).
+        \item $h_{ij} \in \{0, 1\}$: Boolean variable, $1$ if team $i$ plays Home against $j$, $0$ otherwise.
+    \end{itemize}
+    \subsubsection{Objective Function and Bounds}
+    To minimize the disparity between home and away games, we introduce the objective variable $\beta$ representing the \textit{Total Imbalance}.
+    For each team $t \in \mathcal{T}$, we define:
+    \begin{itemize}
+        \item $H_t = \sum_{j \in \mathcal{T}, j \neq t} h_{tj}$: The total number of home games played by team $t$.
+        \item $A_t = \sum_{j \in \mathcal{T}, j \neq t} (1 - h_{tj})$: The total number of away games played by team $t$.
+        \item $\delta_t = |H_t - A_t|$: The individual imbalance for team $t$.
+    \end{itemize}
+    The optimization goal is to minimize the maximum individual imbalance:
+    $$ \text{minimize } \beta \quad \text{subject to} \quad \beta = \max_{t \in \mathcal{T}} \delta_t $$ \textbf{Bounds:} Since the total number of games per team is $n-1$ (which is odd given that $n$ is even), perfect balance ($\delta_t=0$) is impossible. The minimum possible difference is 1 (e.g., $\frac{n}{2}$ home vs $\frac{n}{2}-1$ away). The maximum possible difference occurs if a team plays all games at home or away ($n-1$). Therefore, the domain of the objective variable is:
+    $$ \beta \in [1, n-1] $$
+
+
+
+\subsection{Pre-processing: The Circle Method.}
+Let $n$ be the even number of teams. We designate team $n$ as the fixed \textit{pivot}. The remaining $n-1$ teams form the "circle", represented formally as an ordered sequence $C = (c_0, c_1, \dots, c_{n-2})$ where $c_i \in \{1, \dots, n-1\}$.
+To analyze the impact of the initial configuration, we implemented two variants for $C$:
+\begin{enumerate}
+    \item Standard: $C = (1, 2, \dots, n-1)$.
+    \item Rotated: $C = (2, 3, \dots, n-1, 1)$, obtained by shifting the first element to the end.
+\end{enumerate}
+The schedule consists of $n-1$ weeks, indexed by $w \in \{0, \dots, n-2\}$. For each week $w$, the set of matches is generated using modular arithmetic on the indices of $C$:
+\begin{itemize}
+    \item The pivot plays against the team at index $w$: $\{n, c_w\}$.
+    \item For every offset $k \in \{1, \dots, \frac{n}{2}-1\}$, the team at index $(w+k) \pmod{n-1}$ plays against the team at index $(w-k) \pmod{n-1}$.
+\end{itemize}
+The aggregation of these matches for all $w$ yields the fixed weekly schedule, formally denoted hereafter as the matrix $W$ (where $W_{ij}$ indicates the week in which team $i$ plays team $j$).
+This construction strictly guarantees the satisfaction of the following constraints: 
+\begin{itemize}
+    \item Every team plays with every other team exactly once.
+    \item Every team plays exactly one match per week.
+\end{itemize} \cite{wiki:roundrobin}.
+
+
+\subsection{Implicit Properties and Symmetries}
+We identify specific theoretical properties and symmetries inherent to the problem structure, as analyzed in the literature \cite{hamiez2004}.
+\paragraph{Implicit Properties.}
+Is identified a structural invariant common to all solutions of this problem, referred to as the \textit{Deficient Teams} property.
+Theoretical analysis shows that in any valid schedule, for every period $p$, the set of teams partitions into two distinct subsets:
+\begin{itemize}
+    \item A set $\mathcal{D}_p$ consisting of exactly two teams (called "deficient") that appear exactly once in period $p$.
+    \item The remaining $n-2$ teams, which appear exactly twice in period $p$.
+    \item Furthermore, for any two distinct periods $p$ and $p'$, the deficient teams of $p$ appear twice in $p'$ (implying $\mathcal{D}_p \cap \mathcal{D}_{p'} = \emptyset$).
+\end{itemize}
+This property is intrinsic to the combinatorial structure of the problem and can be exploited later to define implicit constraints.
+
+
+\paragraph{Symmetries}
+This problem is intrinsically symmetric in fact equivalent solutions can typically be obtained through several transformations:
+\begin{itemize}
+    \item Team Permutation: Renumbering the teams (e.g., swapping Team 1 and Team 2) results in an equivalent solution.
+    \item Week Permutation: Swapping the entire schedule of two distinct weeks preserves the validity of the tournament.
+    \item Period Permutation: The periods are indistinguishable; swapping the matches of period $p_i$ with period $p_j$ creates an equivalent valid schedule.
+\end{itemize} However, in our specific approach, the pre-processing phase (Circle Method) produces a fixed match-week matrix $W$. This constant input inherently breaks the Team and Week permutation symmetries, as the specific pairings for every week are pre-determined.
+
+
+
+
+
+
+
+
+
+\section{CP Model}
+% Mandatory for all groups[cite: 14].
+
+\subsection{Decision variables}
+% Describe variables, initial domains (bounds), and semantics[cite: 16].
+% Example: The variable $B_i$ has domain [0..100]...[cite: 17].
+
+\subsection{Objective function}
+% Describe objective variable/bounds if specific to this model. Explain the function[cite: 19].
+
+\subsection{Constraints}
+% Start with main strictly necessary constraints[cite: 27].
+% Use global constraints where applicable (e.g., $allDifferent$)[cite: 26].
+
+\subsubsection*{Implied constraints}
+% Optional. Discuss why extra constraints are implied and their utility[cite: 28].
+
+\subsubsection*{Symmetry breaking constraints}
+% Optional but recommended. Describe observed symmetries and how constraints reduce them[cite: 29].
+
+\subsection{Validation}
+% Implement in MiniZinc, run with at least Gecode[cite: 32].
+
+\subsubsection*{Experimental design}
+% Detail hardware, software, time limits, and strategies used. Results must be reproducible[cite: 37, 38].
+
+\subsubsection*{Experimental results}
+% Mandatory table format[cite: 41]. 
+% Bold = Optimal. UNSAT = Unsatisfiable. N/A or - = Time limit [cite: 48-50].
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{lcccc}
+        \toprule
+        \textbf{ID} & \textbf{Appr. 1 (e.g., Chuffed)} & \textbf{Appr. 2 (e.g., Gecode)} & \textbf{...} & \textbf{...} \\
+        \midrule
+        1 & \textbf{100} & 120 & 80 & - \\
+        2 & 50 & 60 & N/A & N/A \\
+        3 & UNSAT & UNSAT & N/A & N/A \\
+        \bottomrule
+    \end{tabular}
+    \caption{Experimental results showing runtime (s) or best objective value.}
+    \label{tab:cp_results}
+\end{table}
+
+\section{SAT Model}
+% Mandatory for groups of 4. Groups of <=3 choose SAT or SMT (bonus for both)[cite: 53].
+
+\subsection{Decision variables}
+% Describe literals and semantics (e.g., $\Delta_{i,j} = true$ iff...)[cite: 55, 56].
+
+\subsection{Objective function}
+% Explain how optimization is managed in SAT[cite: 58].
+
+\subsection{Constraints}
+% Describe clauses and encoding used[cite: 61].
+
+\subsection{Validation}
+% Use at least Z3. Bonus for Dimacs/solver-independent language[cite: 65].
+% Include Experimental Design and Results Table here as well.
+
+\section{SMT Model}
+% Mandatory for groups of 4. Groups of <=3 choose SAT or SMT (bonus for both)[cite: 68].
+
+\subsection{Decision variables}
+% Specify sort of each variable and theory used[cite: 71].
+
+\subsection{Objective function}
+% See Section 2.2[cite: 72].
+
+\subsection{Constraints}
+% See Section 2.3[cite: 76].
+
+\subsection{Validation}
+% Use Z3 or CVC5. Bonus for SMT-LIB[cite: 79, 80].
+% Include Experimental Design and Results Table here as well.
+
+\section{MIP Model}
+% Mandatory for all groups[cite: 82].
+
+\subsection{Decision variables}
+% See Section 2.1[cite: 85].
+
+\subsection{Objective function}
+% Must be linear[cite: 87].
+
+\subsection{Constraints}
+% Must be linear[cite: 90].
+
+\subsection{Validation}
+% Bonus for solver-independent language (e.g., AMPL)[cite: 92].
+% Include Experimental Design and Results Table here as well.
+
+\section{Conclusions}
+% Brief concluding remarks[cite: 95].
+
+\section*{Authenticity and Author Contribution Statement}
+% Declare work is your own. Cite ideas taken from others[cite: 97, 98].
+% AI usage must be disclosed and referenced[cite: 99, 100].
+% Describe each author's contribution[cite: 101].
+
+\begin{thebibliography}{9}
+% List references here[cite: 103].
+\bibitem{wiki:roundrobin}
+Wikipedia contributors, \textit{Round-robin tournament}, Wikipedia, The Free Encyclopedia. Available at: \url{https://en.wikipedia.org/wiki/Round-robin_tournament} [Accessed: 15  June 2025].
+\bibitem{hamiez2004}
+J.-P. Hamiez and J.-K. Hao, ``Using solution properties within an enumerative search to solve a sports league scheduling problem,'' \textit{Discrete Applied Mathematics}, vol. 156, pp. 1683--1693, 2008.
+\end{thebibliography}
+
+\end{document}
