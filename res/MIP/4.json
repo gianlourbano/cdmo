@@ -1,0 +1,34 @@
+{
+  "presolve": {
+    "time": 0,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "standard": {
+    "time": 0,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-standard": {
+    "time": 1,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-presolve": {
+    "time": 0,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  }
+}

@@ -88,10 +88,13 @@ class MIPPresolveSolver(MIPBaseSolver):
         
         # Create variables
         x = {}
+        y = {}
         for w in week_keys:
             for p in range(1, periods + 1):
                 for i, j in matches_per_week[w]:
                     x[w, p, i, j] = solver.BoolVar(f"x_{w}_{p}_{i}_{j}")
+                    # Orientation: 1 => i home, 0 => j home; only meaningful if x==1
+                    y[w, p, i, j] = solver.BoolVar(f"y_{w}_{p}_{i}_{j}")
         
         # Constraints
         # Each match assigned to exactly one period
@@ -113,21 +116,27 @@ class MIPPresolveSolver(MIPBaseSolver):
         
         # Optimization: minimize home/away imbalance
         if self.optimization:
-            # Count home and away games for each team
+            # Count home and away games for each team using orientation y
             home_count = {}
             away_count = {}
             for t in teams:
-                home_games = []
-                away_games = []
+                home_terms = []
+                away_terms = []
                 for w in week_keys:
                     for i, j in matches_per_week[w]:
                         for p in range(1, periods + 1):
-                            if i == t:  # t plays at home
-                                home_games.append(x[w, p, i, j])
-                            elif j == t:  # t plays away
-                                away_games.append(x[w, p, i, j])
-                home_count[t] = solver.Sum(home_games) if home_games else 0
-                away_count[t] = solver.Sum(away_games) if away_games else 0
+                            # tie orientation to assignment: if x==0, y must be 0
+                            solver.Add(y[w, p, i, j] <= x[w, p, i, j])
+                            if i == t:
+                                # home += y; away += x - y
+                                home_terms.append(y[w, p, i, j])
+                                away_terms.append(x[w, p, i, j] - y[w, p, i, j])
+                            elif j == t:
+                                # home += x - y; away += y
+                                home_terms.append(x[w, p, i, j] - y[w, p, i, j])
+                                away_terms.append(y[w, p, i, j])
+                home_count[t] = solver.Sum(home_terms) if home_terms else 0
+                away_count[t] = solver.Sum(away_terms) if away_terms else 0
             
             # Create imbalance variables for each team
             imbalance = {}
@@ -137,8 +146,13 @@ class MIPPresolveSolver(MIPBaseSolver):
                 solver.Add(imbalance[t] >= home_count[t] - away_count[t])
                 solver.Add(imbalance[t] >= away_count[t] - home_count[t])
             
+            # Near-balance bounds (optional): difference within 1 for each team
+            for t in teams:
+                solver.Add(home_count[t] - away_count[t] <= 1)
+                solver.Add(away_count[t] - home_count[t] <= 1)
+
             # Minimize maximum imbalance across all teams
-            max_imbalance = solver.NumVar(0, n - 1, "max_imbalance")
+            max_imbalance = solver.NumVar(0, periods, "max_imbalance")
             for t in teams:
                 solver.Add(max_imbalance >= imbalance[t])
             
@@ -172,8 +186,24 @@ class MIPPresolveSolver(MIPBaseSolver):
         
         # Extract objective value if optimization enabled
         obj_value = None
-        if self.optimization and solver.Objective():
-            obj_value = int(solver.Objective().Value())
+        if self.optimization:
+            try:
+                if solver.Objective():
+                    obj_value = int(solver.Objective().Value())
+                else:
+                    # Fallback: compute from imbalance variables if present
+                    try:
+                        obj_value = 0
+                        for t in teams:
+                            v = solver.LookupVariable(f"imbalance_{t}")
+                            if v is not None:
+                                val = int(v.solution_value())
+                                if val > obj_value:
+                                    obj_value = val
+                    except Exception:
+                        obj_value = None
+            except Exception:
+                obj_value = None
         
         return STSSolution(
             time=min(elapsed, self.timeout),

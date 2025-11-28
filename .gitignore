@@ -52,10 +52,6 @@ Thumbs.db
 *.tmp
 *.temp
 
-# Results (but keep structure)
-res/*/*.json
-!res/.gitkeep
-
 # MiniZinc
 *.mzn.tmp
 *.dzn.tmp

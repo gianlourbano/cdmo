@@ -21,10 +21,11 @@ from .solve import solve as solve_command
 @click.argument("max_n", type=int)
 @click.option("--approach", "-a", type=click.Choice(["CP", "SAT", "SMT", "MIP"]), default="CP")
 @click.option("--model", "-m", help="Specific model (formulation) to use")
-@click.option("--timeout", "-t", type=int, default=None, help="Timeout in seconds (defaults from config)")
+@click.option("--solver", "-s", help="Backend only for CP/MIP (e.g., gecode, CBC, SCIP)")
+@click.option("--timeout", "-t", type=int, default=300, help="Timeout in seconds (defaults from config)")
 @click.option("--all-solvers", is_flag=True, help="Run all available models for the approach")
 @click.option("--optimization", "-O", is_flag=True, help="Enable optimization mode (only models supporting it)")
-def benchmark(max_n: int, approach: str, model: Optional[str], timeout: Optional[int], all_solvers: bool, optimization: bool):
+def benchmark(max_n: int, approach: str, model: Optional[str], solver: Optional[str], timeout: Optional[int], all_solvers: bool, optimization: bool):
     """Run benchmark for instances from 4 to MAX_N teams.
 
     When `--optimization` is set, only solvers declaring optimization support
@@ -50,6 +51,11 @@ def benchmark(max_n: int, approach: str, model: Optional[str], timeout: Optional
         click.echo(f"Running benchmark for {approach} approach up to {max_n} teams")
         if model:
             click.echo(f"Using model: {model}")
+        if solver:
+            if approach in {"SAT", "SMT"}:
+                click.echo(f"Note: '{approach}' ignores --solver backend", err=True)
+            else:
+                click.echo(f"Backend: {solver}")
         # Single model or default selection; default will be chosen via registry taking optimization flag into account
         solvers_to_test = [model] if model else [None]
 
@@ -77,7 +83,7 @@ def benchmark(max_n: int, approach: str, model: Optional[str], timeout: Optional
                 if chosen_model_name:
                     is_opt_model = chosen_model_name.lower().startswith("opt_")
                     result_name = f"opt-{chosen_model_name}" if (optimization or is_opt_model) else chosen_model_name
-                cb(n=n, approach=approach, model=chosen_model_name, solver=None, timeout=effective_timeout, output=None, optimization=optimization, name=result_name)
+                cb(n=n, approach=approach, model=chosen_model_name, solver=solver, timeout=effective_timeout, output=None, optimization=optimization, name=result_name)
                 elapsed = time.time() - start_time
 
                 # Read objective if optimization enabled
@@ -88,8 +94,8 @@ def benchmark(max_n: int, approach: str, model: Optional[str], timeout: Optional
                         try:
                             with open(results_path) as rf:
                                 data = json.load(rf)
-                            # Look under the prefixed result key
-                            key = f"opt-{chosen_model_name}"
+                            # Look under the exact saved key used earlier
+                            key = result_name or f"opt-{chosen_model_name}"
                             entry = data.get(key)
                             obj_val = entry.get("obj") if entry else None
                             if obj_val is not None:

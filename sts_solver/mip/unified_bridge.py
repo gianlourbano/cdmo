@@ -19,37 +19,6 @@ class MIPStandardSolver(_Std):
     """Standard MIP formulation (default backend: CBC)"""
     pass
 
-
-@registry.register("MIP", "optimized")
-class MIPOptimizedSolver(_Opt):
-    """Optimized MIP formulation with symmetry breaking (default backend: CBC)"""
-    pass
-
-
-@registry.register("MIP", "compact")
-class MIPCompactSolver(_Compact):
-    """Compact MIP formulation with fewer variables (default backend: CBC)"""
-    pass
-
-
-@registry.register("MIP", "match")
-class MIPMatch(_Match):
-    """Simplified match-based formulation (default backend: SCIP)"""
-    pass
-
-
-@registry.register("MIP", "match_compact")
-class MIPMatchCompact(_MatchCompact):
-    """True compact match-based formulation (default backend: SCIP)"""
-    pass
-
-
-@registry.register("MIP", "flow")
-class MIPFlow(_Flow):
-    """Multi-commodity flow formulation (default backend: SCIP)"""
-    pass
-
-
 @registry.register("MIP", "presolve")
 class MIPPresolve(_Presolve):
     """Presolve formulation with precomputed round-robin (default backend: SCIP)"""

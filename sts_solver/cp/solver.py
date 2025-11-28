@@ -16,35 +16,92 @@ from typing import Optional, List, Dict, Any, Tuple
 import tempfile
 import re
 
-import pymzn
+from datetime import timedelta
+from minizinc import Model, Solver, Instance
+from minizinc.result import Status
 
 from ..utils.solution_format import STSSolution
 
+_LAST_RAW_CP_OUTPUT: Dict[str, str] = {}
 
-def _circle_weeks(n: int) -> List[List[int]]:
-    """Generate week matrix for circle method.
 
-    week[i-1][j-1] = week number (1..n-1) when i plays j, 0 on diagonal.
-    """
+# ==== Old main style helpers (input & output handling) ====
+def circle_matchings(n: int) -> Dict[int, List[Tuple[int, int]]]:
     pivot = n
     circle = list(range(1, n))
     weeks = n - 1
-    # Initialize matrix with zeros
-    week: List[List[int]] = [[0 for _ in range(n)] for _ in range(n)]
-    for w in range(weeks):
-        # pivot vs circle[w]
-        opp = circle[w]
-        a, b = pivot, opp
-        week[a-1][b-1] = w + 1
-        week[b-1][a-1] = w + 1
+    matchings: Dict[int, List[Tuple[int, int]]] = {}
+    for w in range(1, weeks + 1):
+        ms: List[Tuple[int, int]] = [(pivot, circle[w - 1])]
         for k in range(1, n // 2):
-            i = circle[(w + k) % (n - 1)]
-            j = circle[(w - k) % (n - 1)]
-            if i > j:
-                i, j = j, i
-            week[i-1][j-1] = w + 1
-            week[j-1][i-1] = w + 1
-    return week
+            i = circle[(w - 1 + k) % (n - 1)]
+            j = circle[(w - 1 - k) % (n - 1)]
+            ms.append((i, j))
+        matchings[w] = ms
+    return matchings
+
+
+def _weeks_matrix_from_matchings(n: int, matchings: Dict[int, List[Tuple[int, int]]]) -> List[List[int]]:
+    weeks_mat = [[0 for _ in range(n)] for _ in range(n)]
+    for week_num, matches in matchings.items():
+        for (i, j) in matches:
+            weeks_mat[i - 1][j - 1] = week_num
+            weeks_mat[j - 1][i - 1] = week_num
+    return weeks_mat
+
+
+def _format_week_matrix_mzn_from_array(week: List[List[int]]) -> str:
+    rows = []
+    for idx, row in enumerate(week):
+        line = ", ".join(str(v) for v in row)
+        if idx == len(week) - 1:
+            rows.append(f"{line} |];")
+        else:
+            rows.append(f"{line} |")
+    return "week = [|\n" + "\n".join(rows)
+
+
+def _build_dzn_content(n: int, week_matrix: List[List[int]]) -> str:
+    return (
+        f"num_teams = {n};\n"
+        f"num_weeks = {n - 1};\n"
+        f"num_periods = {n // 2};\n\n"
+        + _format_week_matrix_mzn_from_array(week_matrix)
+        + "\n"
+    )
+
+
+def _solution_transform(n: int, matchings: Dict[int, List[Tuple[int, int]]], period_matrix, home_matrix) -> List[List[List[int]]]:
+    periods = n // 2
+    weeks = n - 1
+    matrix: List[List[List[int]]] = [[[] for _ in range(weeks)] for _ in range(periods)]
+    for week in range(1, weeks + 1):
+        matches = matchings.get(week, [])
+        for (i, j) in matches:
+            p = period_matrix[i - 1][j - 1]
+            home_team, away_team = (i, j) if home_matrix[i - 1][j - 1] else (j, i)
+            matrix[p - 1][week - 1] = [home_team, away_team]
+    # Fill any missing cells with [0,0] for robustness
+    for p in range(periods):
+        for w in range(weeks):
+            if not matrix[p][w]:
+                matrix[p][w] = [0, 0]
+    return matrix
+
+
+def _circle_weeks(n: int):
+    pivot, circle = n, list(range(1, n))
+    #pivot, circle = n, list(range(2, n)) + [1]
+    weeks = n - 1
+    m = {}
+    for w in range(1, weeks + 1):
+        ms = [(pivot, circle[w-1])]
+        for k in range(1, n//2):
+            i = circle[(w-1 + k) % (n-1)]
+            j = circle[(w-1 - k) % (n-1)]
+            ms.append((i, j))
+        m[w] = ms
+    return m
 
 
 def _reconstruct_schedule_from_period_home(n: int, week: List[List[int]], period: List[List[int]], home: List[List[int]]) -> List[List[List[int]]]:
@@ -76,83 +133,7 @@ def _reconstruct_schedule_from_period_home(n: int, week: List[List[int]], period
     return schedule
 
 
-def solve_cp(
-    n: int,
-    solver: Optional[str] = None,
-    timeout: int = 300,
-    optimization: bool = False,
-) -> STSSolution:
-    """Solve STS using MiniZinc CP backend.
-
-    When `optimization=True`, uses enhanced imbalance minimization model and
-    returns objective value; otherwise returns satisfy-only schedule.
-    """
-    backend = solver or "gecode"
-    start_time = time.time()
-
-    try:
-        if optimization:
-            model_path = Path(__file__).parent.parent.parent / "source" / "CP" / "circle_method_SB_modified_new_sb.mzn"
-            if not model_path.exists():
-                raise FileNotFoundError(f"Optimization model not found at {model_path}")
-            week_matrix = _circle_weeks(n)
-            data = {
-                "num_teams": n,
-                "num_weeks": n - 1,
-                "num_periods": n // 2,
-                "week": week_matrix,
-            }
-            result = pymzn.minizinc(
-                str(model_path),
-                data=data,
-                solver=backend,
-                timeout=timeout,
-                output_mode="dict",
-            )
-            elapsed = int(time.time() - start_time)
-            if result:
-                r0 = result[0]
-                # Expect period and home matrices
-                period_raw = r0.get("period")
-                home_raw = r0.get("home")
-                total_imbalance = r0.get("total_imbalance")
-                if period_raw is None or home_raw is None:
-                    return STSSolution(time=elapsed, optimal=False, obj=None, sol=[])
-                schedule = _reconstruct_schedule_from_period_home(n, week_matrix, period_raw, home_raw)
-                return STSSolution(time=elapsed, optimal=True, obj=total_imbalance, sol=schedule)
-            else:
-                return STSSolution(time=timeout, optimal=False, obj=None, sol=[])
-        else:
-            model_path = Path(__file__).parent.parent.parent / "source" / "CP" / "sts.mzn"
-            if not model_path.exists():
-                raise FileNotFoundError(f"MiniZinc model not found at {model_path}")
-            data = {"n": n}
-            result = pymzn.minizinc(
-                str(model_path),
-                data=data,
-                solver=backend,
-                timeout=timeout,
-                output_mode="dict",
-            )
-            elapsed = int(time.time() - start_time)
-            if result:
-                schedule_flat = result[0]["schedule"]
-                periods = n // 2
-                weeks = n - 1
-                schedule: List[List[List[int]]] = []
-                for p in range(periods):
-                    period_games: List[List[int]] = []
-                    for w in range(weeks):
-                        period_games.append(schedule_flat[w * periods + p])
-                    schedule.append(period_games)
-                return STSSolution(time=elapsed, optimal=True, obj=None, sol=schedule)
-            else:
-                return STSSolution(time=timeout, optimal=False, obj=None, sol=[])
-    except Exception:
-        elapsed = int(time.time() - start_time)
-        if elapsed > timeout:
-            elapsed = timeout
-        return STSSolution(time=elapsed, optimal=False, obj=None, sol=[])
+# (Legacy solve_cp function removed; unified bridge uses solve_cp_mzn)
 
 
 def _rewrite_solve_line(model_text: str, strategy: str, optimization: bool) -> str:
@@ -209,87 +190,88 @@ def _rewrite_solve_line(model_text: str, strategy: str, optimization: bool) -> s
     return "\n".join(lines) + "\n"
 
 
+# (Old helper names replaced by explicit old_main-style variants above)
+
+
 def solve_cp_mzn(
     model_path: Path,
     n: int,
     backend: str = "gecode",
     timeout: int = 300,
     search_strategy: Optional[str] = None,
+    optimization: bool = False,
 ) -> STSSolution:
-    """Run a specific MiniZinc model file and parse into STSSolution.
+    """Execute MiniZinc model via native API; extract period/home and objective.
 
-    Parsing strategy:
-    - If 'schedule' (flat) is present: reshape to periods x weeks
-    - Else if 'period' and 'home' are present: reconstruct from circle weeks
-    - Objective: read 'total_imbalance' if present, else None
+    We no longer rely on printed output; variables are accessed directly from
+    the result object. Schedule reconstruction mimics legacy approach.
     """
-    start_time = time.time()
+    start = time.time()
     try:
         if not model_path.exists():
-            raise FileNotFoundError(f"MiniZinc model not found at {model_path}")
-        data: Dict[str, Any] = {
-            "n": n,
-            "num_teams": n,
-            "num_weeks": n - 1,
-            "num_periods": n // 2,
-        }
-        # Provide week matrix for models that might expect it
+            raise FileNotFoundError(f"MiniZinc model not found: {model_path}")
+
+        # EXACT old_main-style input handling
+        matchings = circle_matchings(n)
+        week_matrix = _weeks_matrix_from_matchings(n, matchings)
+        dzn_content = _build_dzn_content(n, week_matrix)
+
+        # Read model (no solve line rewrite since user requested exact behavior)
+        model_text = model_path.read_text()
+        tmp_mzn = tempfile.NamedTemporaryFile(delete=False, suffix=".mzn")
+        tmp_mzn.write(model_text.encode("utf-8"))
+        tmp_mzn.flush()
+        m = Model(tmp_mzn.name)
+        s = Solver.lookup(backend)
+        inst = Instance(s, m)
+        inst.add_string(dzn_content)
+
+        remaining = timeout - (time.time() - start)
+        if remaining <= 0:
+            return STSSolution(time=timeout, optimal=False, obj=None, sol=[])
+
+        results = inst.solve(timeout=timedelta(seconds=remaining), random_seed=42)
+        elapsed = int(time.time() - start)
+
+        status = results.status
+        if status in (Status.UNSATISFIABLE, Status.UNKNOWN):
+            optimal_flag = status == Status.UNSATISFIABLE
+            return STSSolution(time=min(elapsed, timeout), optimal=optimal_flag, obj=None, sol=[])
+
+        # Output handling identical to old_main: extract matrices, build schedule matrix
         try:
-            data["week"] = _circle_weeks(n)
+            period_raw = results["period"]
+            home_raw = results["home"]
         except Exception:
-            pass
+            return STSSolution(time=min(elapsed, timeout), optimal=False, obj=None, sol=[])
 
-        effective_path = model_path
-        if search_strategy:
+        # Transform to (n/2) x (n-1) matrix of [home, away]
+        schedule_matrix = _solution_transform(n, matchings, period_raw, home_raw)
+
+        # Objective (may be absent for satisfy-only models)
+        try:
+            obj_val = results.objective
+        except Exception:
+            obj_val = None
+        if isinstance(obj_val, float):
             try:
-                original = model_path.read_text()
-                rewritten = _rewrite_solve_line(original, search_strategy, False)
-                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mzn")
-                tmp.write(rewritten.encode("utf-8"))
-                tmp.flush()
-                effective_path = Path(tmp.name)
+                obj_val = int(obj_val)
             except Exception:
-                pass  # fallback to original
+                obj_val = None
+        elif not isinstance(obj_val, int):
+            obj_val = None
 
-        result = pymzn.minizinc(
-            str(effective_path),
-            data=data,
-            solver=backend,
-            timeout=timeout,
-            output_mode="dict",
-        )
-        elapsed = int(time.time() - start_time)
-        if not result:
-            return STSSolution(time=elapsed if elapsed <= timeout else timeout, optimal=False, obj=None, sol=[])
+        # Optimal flag semantics: decisional (satisfy) treats SATISFIED as optimal; optimization requires OPTIMAL_SOLUTION
+        contains_minimize = any("minimize" in line for line in model_text.splitlines() if line.strip().startswith("solve"))
+        if contains_minimize:
+            optimal_flag = status == Status.OPTIMAL_SOLUTION
+        else:
+            optimal_flag = status == Status.SATISFIED
 
-        r0 = result[0]
-        obj = r0.get("total_imbalance") if isinstance(r0, dict) else None
-        periods = n // 2
-        weeks = n - 1
-
-        # Case 1: direct schedule (flat list of length weeks*periods)
-        schedule_flat = r0.get("schedule") if isinstance(r0, dict) else None
-        if schedule_flat:
-            schedule: List[List[List[int]]] = []
-            for p_idx in range(periods):
-                period_games: List[List[int]] = []
-                for w_idx in range(weeks):
-                    period_games.append(schedule_flat[w_idx * periods + p_idx])
-                schedule.append(period_games)
-            return STSSolution(time=elapsed, optimal=True, obj=obj, sol=schedule)
-
-        # Case 2: period + home matrices with circle week mapping
-        period_raw = r0.get("period") if isinstance(r0, dict) else None
-        home_raw = r0.get("home") if isinstance(r0, dict) else None
-        if period_raw is not None and home_raw is not None:
-            week_matrix = _circle_weeks(n)
-            schedule = _reconstruct_schedule_from_period_home(n, week_matrix, period_raw, home_raw)
-            return STSSolution(time=elapsed, optimal=True, obj=obj, sol=schedule)
-
-        # Fallback: unable to parse
-        return STSSolution(time=elapsed, optimal=False, obj=None, sol=[])
+        return STSSolution(time=min(elapsed, timeout), optimal=optimal_flag, obj=obj_val, sol=schedule_matrix)
     except Exception:
-        elapsed = int(time.time() - start_time)
+        elapsed = int(time.time() - start)
         if elapsed > timeout:
             elapsed = timeout
         return STSSolution(time=elapsed, optimal=False, obj=None, sol=[])
+    

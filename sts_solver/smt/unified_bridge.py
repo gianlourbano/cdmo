@@ -14,19 +14,19 @@ class SMTBaselineSolver(SMTBaselineNativeSolver):
     pass
 
 
-@registry.register("SMT", "optimized")
-class SMTOptimizedSolver(SMTOptimizedNativeSolver):
-    pass
+# @registry.register("SMT", "optimized")
+# class SMTOptimizedSolver(SMTOptimizedNativeSolver):
+#     pass
 
 
-@registry.register("SMT", "compact")
-class SMTCompactSolver(SMTCompactNativeSolver):
-    pass
+# @registry.register("SMT", "compact")
+# class SMTCompactSolver(SMTCompactNativeSolver):
+#     pass
 
 
-@registry.register("SMT", "presolve")
-class SMTPresolveSolver(SMTPresolveNativeSolver):
-    pass
+# @registry.register("SMT", "presolve")
+# class SMTPresolveSolver(SMTPresolveNativeSolver):
+#     pass
 
 
 @registry.register("SMT", "presolve_2")
@@ -34,11 +34,11 @@ class SMTPresolve2Solver(SMTPresolve2NativeSolver):
     pass
 
 
-@registry.register("SMT", "presolve_3")
-class SMTPresolve3Solver(SMTPresolve3NativeSolver):
-    pass
+# @registry.register("SMT", "presolve_3")
+# class SMTPresolve3Solver(SMTPresolve3NativeSolver):
+#     pass
 
 
-@registry.register("SMT", "presolve_symmetry")
-class SMTPresolveSymmetrySolver(SMTPresolveSymmetryNativeSolver):
-    pass
+# @registry.register("SMT", "presolve_symmetry")
+# class SMTPresolveSymmetrySolver(SMTPresolveSymmetryNativeSolver):
+#     pass

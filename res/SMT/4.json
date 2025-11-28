@@ -1,0 +1,26 @@
+{
+  "opt-presolve_2": {
+    "time": 300,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "presolve_2": {
+    "time": 300,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "baseline": {
+    "time": 0,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  }
+}

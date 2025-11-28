@@ -80,15 +80,27 @@ class MIPStandardNativeSolver(MIPBaseSolver):
                     <= 2
                 )
 
-        # Optional objective
+        # Optional objective (minimize maximum home/away imbalance across teams)
         if self.optimization:
-            home_games = {k: solver.Sum(match_vars[k, j, w, p] for j in teams if k != j for w in weeks for p in periods) for k in teams}
-            away_games = {k: solver.Sum(match_vars[i, k, w, p] for i in teams if i != k for w in weeks for p in periods) for k in teams}
-            deviation = {k: solver.NumVar(0, solver.infinity(), f"dev_{k}") for k in teams}
+            home_games = {k: solver.Sum(
+                match_vars[k, j, w, p]
+                for j in teams if k != j
+                for w in weeks for p in periods
+            ) for k in teams}
+            away_games = {k: solver.Sum(
+                match_vars[i, k, w, p]
+                for i in teams if i != k
+                for w in weeks for p in periods
+            ) for k in teams}
+            imbalance = {k: solver.NumVar(0, self.weeks, f"imbalance_{k}") for k in teams}
             for k in teams:
-                solver.Add(deviation[k] >= home_games[k] - away_games[k])
-                solver.Add(deviation[k] >= away_games[k] - home_games[k])
-            solver.Minimize(solver.Sum(deviation[k] for k in teams))
+                # imbalance[k] >= |home_games[k] - away_games[k]|
+                solver.Add(imbalance[k] >= home_games[k] - away_games[k])
+                solver.Add(imbalance[k] >= away_games[k] - home_games[k])
+            max_imbalance = solver.NumVar(0, self.weeks, "max_imbalance")
+            for k in teams:
+                solver.Add(max_imbalance >= imbalance[k])
+            solver.Minimize(max_imbalance)
 
         return solver, {"match_vars": match_vars, "weeks": weeks, "periods": periods}
 

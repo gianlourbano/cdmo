@@ -32,7 +32,7 @@ def solve(
     output: Optional[str],
     optimization: bool,
     name: Optional[str],
-    search_strategy: Optional[str],
+    search_strategy: Optional[str] = None,
 ):
     """Solve STS instance with N teams using specified approach (modular CLI)."""
 
