@@ -73,7 +73,7 @@ docker images sts-solver --format "{{.Size}}"
 
 ```bash
 docker run --rm -v $(pwd)/res:/app/res sts-solver \
-    uv run sts solve <N> <APPROACH> [OPTIONS]
+    uv run sts solve <N> <APPROACH> [--model NAME] [--solver BACKEND] [OPTIONS]
 ```
 
 ### Examples by Approach
@@ -95,11 +95,11 @@ docker run --rm -v $(pwd)/res:/app/res sts-solver \
 ```bash
 # Baseline SAT encoding
 docker run --rm -v $(pwd)/res:/app/res sts-solver \
-    uv run sts solve 10 SAT --solver baseline --timeout 300
+    uv run sts solve 10 SAT --model baseline --timeout 300
 
 # Pairwise SAT encoding
 docker run --rm -v $(pwd)/res:/app/res sts-solver \
-    uv run sts solve 12 SAT --solver pairwise --timeout 300
+    uv run sts solve 12 SAT --model pairwise --timeout 300
 ```
 
 #### SMT Solving
@@ -107,18 +107,18 @@ docker run --rm -v $(pwd)/res:/app/res sts-solver \
 ```bash
 # Presolve_2 solver (best performance)
 docker run --rm -v $(pwd)/res:/app/res sts-solver \
-    uv run sts solve 14 SMT --solver presolve_2 --timeout 300
+    uv run sts solve 14 SMT --model presolve_2 --timeout 300
 
 # With optimization (home/away balance)
 docker run --rm -v $(pwd)/res:/app/res sts-solver \
-    uv run sts solve 16 SMT --solver presolve_2 --timeout 300 --optimization
+    uv run sts solve 16 SMT --model presolve_2 --timeout 300 --optimization
 
-# Other SMT solvers
+# Other SMT models
 docker run --rm -v $(pwd)/res:/app/res sts-solver \
-    uv run sts solve 12 SMT --solver baseline --timeout 300
+    uv run sts solve 12 SMT --model baseline --timeout 300
 
 docker run --rm -v $(pwd)/res:/app/res sts-solver \
-    uv run sts solve 14 SMT --solver optimized --timeout 300
+    uv run sts solve 14 SMT --model optimized --timeout 300
 ```
 
 #### Mixed-Integer Programming (MIP)
@@ -126,19 +126,19 @@ docker run --rm -v $(pwd)/res:/app/res sts-solver \
 ```bash
 # Standard formulation
 docker run --rm -v $(pwd)/res:/app/res sts-solver \
-    uv run sts solve 10 MIP --solver standard --timeout 300
+    uv run sts solve 10 MIP --model standard --solver CBC --timeout 300
 
 # Optimized formulation (better for n≥12)
 docker run --rm -v $(pwd)/res:/app/res sts-solver \
-    uv run sts solve 14 MIP --solver optimized --timeout 300
+    uv run sts solve 14 MIP --model optimized --solver CBC --timeout 300
 
 # Compact formulation (fewer variables)
 docker run --rm -v $(pwd)/res:/app/res sts-solver \
-    uv run sts solve 16 MIP --solver compact --timeout 300
+    uv run sts solve 16 MIP --model compact --solver CBC --timeout 300
 
 # Flow-based formulation
 docker run --rm -v $(pwd)/res:/app/res sts-solver \
-    uv run sts solve 12 MIP --solver flow --timeout 300
+    uv run sts solve 12 MIP --model flow --solver SCIP --timeout 300
 ```
 
 ---
@@ -252,16 +252,20 @@ docker run --rm -v $(pwd)/res:/app/res sts-solver \
     uv run sts compare-instance 14
 ```
 
-### List Available Solvers
+### List Available Models/Backends
 
 ```bash
-docker run --rm sts-solver uv run sts list-solvers
+docker run --rm sts-solver uv run sts list-models
 
 # Filter by approach
-docker run --rm sts-solver uv run sts list-solvers --approach MIP
+docker run --rm sts-solver uv run sts list-models --approach MIP
 
 # Detailed information
-docker run --rm sts-solver uv run sts list-solvers --verbose
+docker run --rm sts-solver uv run sts list-models --verbose
+
+# Backends (CP/MIP)
+docker run --rm sts-solver uv run sts list-backends
+docker run --rm sts-solver uv run sts list-backends --approach CP
 ```
 
 ---
@@ -319,8 +323,9 @@ docker run --rm -it \
 
 Inside the container:
 ```bash
-# List available solvers
-uv run sts list-solvers
+# List available models/backends
+uv run sts list-models
+uv run sts list-backends
 
 # Run individual solver
 uv run sts solve 6 CP --solver gecode
@@ -337,7 +342,7 @@ exit
 ```bash
 # 10-minute timeout
 docker run --rm -v $(pwd)/res:/app/res sts-solver \
-    uv run sts solve 20 SMT --solver presolve_2 --timeout 600
+    uv run sts solve 20 SMT --model presolve_2 --timeout 600
 ```
 
 ### Custom Results Directory
@@ -345,7 +350,7 @@ docker run --rm -v $(pwd)/res:/app/res sts-solver \
 ```bash
 # Save to different directory
 docker run --rm -v $(pwd)/custom_results:/app/res sts-solver \
-    uv run sts solve 12 MIP --solver optimized
+    uv run sts solve 12 MIP --model optimized --solver CBC
 ```
 
 ### Parallel Execution (Multiple Containers)
