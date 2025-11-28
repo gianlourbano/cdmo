@@ -4,7 +4,8 @@ import click
 
 # Commands will be imported and registered below
 from .commands import solve as solve_cmd
-from .commands import list_solvers as list_cmd
+from .commands import list_solvers as list_models_cmd
+from .commands import list_backends as list_backends_cmd
 from .commands import validate as validate_cmd
 from .commands import benchmark as bench_cmd
 from .commands import analyze as analyze_cmd
@@ -21,7 +22,8 @@ def cli():
 
 # Register modular commands
 cli.add_command(solve_cmd.solve)
-cli.add_command(list_cmd.list_solvers)
+cli.add_command(list_models_cmd.list_models)
+cli.add_command(list_backends_cmd.list_backends)
 cli.add_command(validate_cmd.validate)
 cli.add_command(validate_cmd.validate_all)
 cli.add_command(validate_cmd.validate_results)

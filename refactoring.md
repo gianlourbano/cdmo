@@ -498,7 +498,7 @@ sts_solver/cli/
 │   ├── validate.py          # validate, validate-all, validate-results
 │   ├── analyze.py           # analyze, compare-instance
 │   ├── clean.py             # clean-results, remove-solver
-│   ├── list_solvers.py      # list-solvers
+│   ├── list_solvers.py      # list-models
 │   └── backup.py            # backup-results
 └── utils.py                 # Shared CLI utilities
 ```

@@ -46,7 +46,8 @@ class SMTPresolve2NativeSolver(SMTBaseSolver):
             except Exception:
                 solver = Solver()
         solver.set("timeout", self.timeout * 1000)
-        solver.set("random_seed", 69)
+        if not self.optimization:
+            solver.set("random_seed", 69)
 
         p: Dict[Tuple[int, int, int], Any] = {}
         home: Dict[Tuple[int, int, int], Bool] = {}
@@ -81,7 +82,7 @@ class SMTPresolve2NativeSolver(SMTBaseSolver):
                 solver.add(PbLe(guards, 2))
 
         # Optional deficient / double / per-team deficiency constraints (large instances)
-        if periods * 2 >= 22:
+        if periods * 2 >= 20:
             for k in range(1, periods + 1):
                 deficient_guards = []
                 for t in teams:

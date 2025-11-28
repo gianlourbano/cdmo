@@ -20,11 +20,11 @@ from .solve import solve as solve_command
 @click.command()
 @click.argument("max_n", type=int)
 @click.option("--approach", "-a", type=click.Choice(["CP", "SAT", "SMT", "MIP"]), default="CP")
-@click.option("--solver", "-s", help="Specific solver to use")
+@click.option("--model", "-m", help="Specific model (formulation) to use")
 @click.option("--timeout", "-t", type=int, default=None, help="Timeout in seconds (defaults from config)")
-@click.option("--all-solvers", is_flag=True, help="Run all available solvers for the approach")
-@click.option("--optimization", "-O", is_flag=True, help="Enable optimization mode (only solvers supporting it)")
-def benchmark(max_n: int, approach: str, solver: Optional[str], timeout: Optional[int], all_solvers: bool, optimization: bool):
+@click.option("--all-solvers", is_flag=True, help="Run all available models for the approach")
+@click.option("--optimization", "-O", is_flag=True, help="Enable optimization mode (only models supporting it)")
+def benchmark(max_n: int, approach: str, model: Optional[str], timeout: Optional[int], all_solvers: bool, optimization: bool):
     """Run benchmark for instances from 4 to MAX_N teams.
 
     When `--optimization` is set, only solvers declaring optimization support
@@ -48,41 +48,49 @@ def benchmark(max_n: int, approach: str, solver: Optional[str], timeout: Optiona
         click.echo(f"Testing solvers: {', '.join(solvers_to_test)}")
     else:
         click.echo(f"Running benchmark for {approach} approach up to {max_n} teams")
-        if solver:
-            click.echo(f"Using solver: {solver}")
-        # Single solver or default selection; default will be chosen via registry taking optimization flag into account
-        solvers_to_test = [solver] if solver else [None]
+        if model:
+            click.echo(f"Using model: {model}")
+        # Single model or default selection; default will be chosen via registry taking optimization flag into account
+        solvers_to_test = [model] if model else [None]
 
     for n in range(4, max_n + 1, 2):
         click.echo(f"\n{'='*50}")
         click.echo(f"INSTANCE: {n} teams")
         click.echo(f"{'='*50}")
 
-        for test_solver in solvers_to_test:
-            chosen_solver_name: Optional[str] = test_solver
-            if test_solver:
-                click.echo(f"\nTesting {approach} with {test_solver}...")
+        for test_model in solvers_to_test:
+            chosen_model_name: Optional[str] = test_model
+            if test_model:
+                click.echo(f"\nTesting {approach} with {test_model}...")
             else:
-                chosen_solver_name = registry.find_best_solver(approach, n, optimization)
-                click.echo(f"\nTesting {approach} with default solver ({chosen_solver_name})...")
+                chosen_model_name = registry.find_best_solver(approach, n, optimization)
+                click.echo(f"\nTesting {approach} with default model ({chosen_model_name})...")
 
             try:
                 start_time = time.time()
                 cb = getattr(solve_command, 'callback', None)
                 if cb is None:
                     raise RuntimeError('solve callback not available')
-                cb(n=n, approach=approach, solver=test_solver, timeout=effective_timeout, output=None, optimization=optimization, name=test_solver)
+                # Use opt- prefix in saved key when either optimization is enabled
+                # OR the model name starts with "opt_" (MiniZinc optimization models)
+                result_name = None
+                if chosen_model_name:
+                    is_opt_model = chosen_model_name.lower().startswith("opt_")
+                    result_name = f"opt-{chosen_model_name}" if (optimization or is_opt_model) else chosen_model_name
+                cb(n=n, approach=approach, model=chosen_model_name, solver=None, timeout=effective_timeout, output=None, optimization=optimization, name=result_name)
                 elapsed = time.time() - start_time
 
                 # Read objective if optimization enabled
-                if optimization and chosen_solver_name:
+                if optimization and chosen_model_name:
                     cfg = get_config()
                     results_path = cfg.results_dir / approach / f"{n}.json"
                     if results_path.exists():
                         try:
                             with open(results_path) as rf:
                                 data = json.load(rf)
-                            entry = data.get(chosen_solver_name)
+                            # Look under the prefixed result key
+                            key = f"opt-{chosen_model_name}"
+                            entry = data.get(key)
                             obj_val = entry.get("obj") if entry else None
                             if obj_val is not None:
                                 click.echo(f"OK ({elapsed:.1f}s) objective={obj_val}")
@@ -95,7 +103,8 @@ def benchmark(max_n: int, approach: str, solver: Optional[str], timeout: Optiona
                 else:
                     click.echo(f"OK ({elapsed:.1f}s)")
             except Exception as e:
-                click.echo(f"Error with {test_solver or 'default'}: {e}", err=True)
+                label = test_model or 'default'
+                click.echo(f"Error with {label}: {e}", err=True)
 
 
 @click.command(name="comprehensive-benchmark")
@@ -154,7 +163,10 @@ def comprehensive_benchmark(max_n: int, timeout: Optional[int], approaches: Opti
                     cb = getattr(solve_command, 'callback', None)
                     if cb is None:
                         raise RuntimeError('solve callback not available')
-                    cb(n=n, approach=approach, solver=solver, timeout=effective_timeout, output=None, optimization=optimization, name=solver)
+                    # Save optimized runs under opt-<model> to avoid overwrites
+                    is_opt_model = solver.lower().startswith("opt_")
+                    result_name = f"opt-{solver}" if (optimization or is_opt_model) else solver
+                    cb(n=n, approach=approach, model=solver, solver=None, timeout=effective_timeout, output=None, optimization=optimization, name=result_name)
                     elapsed = time.time() - start_time
                     completed_experiments += 1
 
@@ -166,7 +178,7 @@ def comprehensive_benchmark(max_n: int, timeout: Optional[int], approaches: Opti
                             try:
                                 with open(results_path) as rf:
                                     data = json.load(rf)
-                                entry = data.get(solver)
+                                entry = data.get(f"opt-{solver}")
                                 if entry and entry.get("obj") is not None:
                                     obj_txt = f"obj={entry.get('obj')}"
                             except Exception:

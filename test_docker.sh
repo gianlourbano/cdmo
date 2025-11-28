@@ -32,13 +32,13 @@ echo "======================================"
 echo "Testing CLI Commands"
 echo "======================================"
 
-# Test 1: List solvers
+# Test 1: List models
 echo ""
-echo "Test 1: List available solvers"
-if docker run --rm $IMAGE_NAME uv run sts list-solvers | grep -q "CP Solvers"; then
-    echo "✅ list-solvers command works"
+echo "Test 1: List available models"
+if docker run --rm $IMAGE_NAME uv run sts list-models | grep -q "CP Models"; then
+    echo "✅ list-models command works"
 else
-    echo "❌ list-solvers command failed"
+    echo "❌ list-models command failed"
     exit 1
 fi
 

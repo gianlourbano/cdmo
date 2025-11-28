@@ -17,7 +17,7 @@ def get_solvers_for_approach(approach: str) -> List[str]:
     Return the list of solver names to benchmark for an approach.
     
     Uses the unified registry to get all registered solvers for the approach.
-    This ensures consistency with the list-solvers command.
+    This ensures consistency with the list-models command.
     """
     approach = approach.upper()
     

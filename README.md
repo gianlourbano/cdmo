@@ -76,30 +76,34 @@ uv sync
 Solve a single instance:
 
 ```bash
-# Constraint Programming
+# Constraint Programming (backend only via --solver)
 uv run sts solve 6 CP --solver gecode --timeout 300
 
-# MIP with different formulations
-uv run sts solve 8 MIP --solver SCIP --timeout 300
-uv run sts solve 12 MIP --solver optimized-SCIP --timeout 300
-uv run sts solve 14 MIP --solver compact-CBC --timeout 300
-uv run sts solve 16 MIP --solver flow-SCIP --timeout 300
+# MIP (choose formulation via --model, backend via --solver)
+uv run sts solve 8  MIP --model standard  --solver CBC  --timeout 300
+uv run sts solve 12 MIP --model optimized --solver CBC  --timeout 300
+uv run sts solve 14 MIP --model compact   --solver CBC  --timeout 300
+uv run sts solve 16 MIP --model flow      --solver SCIP --timeout 300
 
-# Optimization mode (where supported)
-uv run sts solve 6 SMT --solver presolve_2 --optimization
+# SMT (formulation only via --model; no backend)
+uv run sts solve 6 SMT --model presolve_2 --optimization
 ```
 
-List available solvers and formulations:
+List available models and backends:
 
 ```bash
-# List all solvers
-uv run sts list-solvers
+# List all models (formulations)
+uv run sts list-models
 
 # Filter by approach
-uv run sts list-solvers --approach MIP
+uv run sts list-models --approach MIP
 
 # Show detailed information
-uv run sts list-solvers --verbose
+uv run sts list-models --verbose
+
+# List available backends (CP/MIP)
+uv run sts list-backends
+uv run sts list-backends --approach CP
 ```
 
 Run benchmark:
@@ -180,7 +184,7 @@ For complete automated experiments (as required by project):
 
 For individual commands:
 
-````bash
+```bash
 # Solve instance with 6 teams using CP approach
 docker run --rm -v $(pwd)/res:/app/res sts-solver uv run sts solve 6 CP
 
@@ -189,15 +193,17 @@ docker run --rm -v $(pwd)/res:/app/res sts-solver uv run sts benchmark 20
 
 ### Unified Registry
 
-The CLI is backed by a unified registry that lists and instantiates solvers across all approaches (CP, SAT, SMT, MIP). Use:
+The CLI is backed by a unified registry that lists and instantiates models across all approaches (CP, SAT, SMT, MIP). Use:
 
 ```bash
-uv run sts list-solvers
+uv run sts list-models
 ```
 
-to discover registered solver names and descriptions. The `solve` command accepts these names via `--solver` and falls back to a recommended default when omitted.
+to discover registered model names and descriptions. The `solve` command accepts these names via `--model`. For CP and MIP, you can also select a backend engine via `--solver` (e.g., `gecode`, `CBC`, `SCIP`).
 
 When `--optimization` is passed, only solvers advertising optimization support are considered for default selection and their objective values are recorded (printed in benchmark modes).
+
+Note: When `--optimization` is enabled, results are saved using an `opt-` prefix (e.g., `opt-standard`) unless you provide a custom `--name`. This prevents optimized runs from overwriting non-optimized results in the same `res/<APPROACH>/<n>.json` file.
 
 ### Notes on Migration
 
@@ -351,7 +357,7 @@ uv run mypy sts_solver
 **Workaround:** Use appropriate timeouts:
 ```bash
 # Use shorter timeout for testing
-uv run sts solve 20 MIP --solver optimized --timeout 60
+uv run sts solve 20 MIP --model optimized --timeout 60
 ```
 
 **Affected:** All MIP solvers (standard, optimized, compact, etc.)  

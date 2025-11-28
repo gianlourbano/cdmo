@@ -10,9 +10,9 @@ from .ortools_compact import MIPFlowSolver as _Flow
 from .ortools_presolve import MIPPresolveSolver as _Presolve
 
 
-# Register each solver once (backend can be specified via --solver flag with "-" syntax)
-# Example: uv run sts solve 12 MIP --solver optimized-SCIP
-# Or use default backend (SCIP for most, CBC for standard)
+# Register each model once. Select formulation via `--model` and backend via
+# `--solver` (e.g., `--model optimized --solver CBC`). Defaults are applied
+# by each class when backend is omitted.
 
 @registry.register("MIP", "standard")
 class MIPStandardSolver(_Std):
@@ -20,34 +20,34 @@ class MIPStandardSolver(_Std):
     pass
 
 
-# @registry.register("MIP", "optimized")
-# class MIPOptimizedSolver(_Opt):
-#     """Optimized MIP formulation with symmetry breaking (default backend: CBC)"""
-#     pass
+@registry.register("MIP", "optimized")
+class MIPOptimizedSolver(_Opt):
+    """Optimized MIP formulation with symmetry breaking (default backend: CBC)"""
+    pass
 
 
-# @registry.register("MIP", "compact")
-# class MIPCompactSolver(_Compact):
-#     """Compact MIP formulation with fewer variables (default backend: CBC)"""
-#     pass
+@registry.register("MIP", "compact")
+class MIPCompactSolver(_Compact):
+    """Compact MIP formulation with fewer variables (default backend: CBC)"""
+    pass
 
 
-# @registry.register("MIP", "match")
-# class MIPMatch(_Match):
-#     """Simplified match-based formulation (default backend: SCIP)"""
-#     pass
+@registry.register("MIP", "match")
+class MIPMatch(_Match):
+    """Simplified match-based formulation (default backend: SCIP)"""
+    pass
 
 
-# @registry.register("MIP", "match_compact")
-# class MIPMatchCompact(_MatchCompact):
-#     """True compact match-based formulation (default backend: SCIP)"""
-#     pass
+@registry.register("MIP", "match_compact")
+class MIPMatchCompact(_MatchCompact):
+    """True compact match-based formulation (default backend: SCIP)"""
+    pass
 
 
-# @registry.register("MIP", "flow")
-# class MIPFlow(_Flow):
-#     """Multi-commodity flow formulation (default backend: SCIP)"""
-#     pass
+@registry.register("MIP", "flow")
+class MIPFlow(_Flow):
+    """Multi-commodity flow formulation (default backend: SCIP)"""
+    pass
 
 
 @registry.register("MIP", "presolve")

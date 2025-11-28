@@ -32,6 +32,7 @@ Run all experiments with a single command:
 ```
 
 This will:
+
 1. Build the Docker image
 2. Run comprehensive benchmarks on all approaches
 3. Validate all solutions
@@ -49,11 +50,12 @@ docker build -t sts-solver .
 ```
 
 **What it does:**
-- Installs Python 3.12 with UV package manager
-- Installs all Python dependencies (Z3, OR-Tools, PuLP, etc.)
-- Installs MiniZinc 2.7.5 with Gecode and Chuffed solvers
-- Sets up the project structure
-- Creates result directories
+
+-   Installs Python 3.12 with UV package manager
+-   Installs all Python dependencies (Z3, OR-Tools, PuLP, etc.)
+-   Installs MiniZinc 2.7.5 with Gecode and Chuffed solvers
+-   Sets up the project structure
+-   Creates result directories
 
 **Verification:**
 
@@ -187,10 +189,11 @@ docker run --rm -v $(pwd)/res:/app/res sts-solver \
 ```
 
 This script:
-- Runs comprehensive benchmark up to n=20
-- Tests all solver formulations
-- Generates analysis reports
-- Exports results in multiple formats
+
+-   Runs comprehensive benchmark up to n=20
+-   Tests all solver formulations
+-   Generates analysis reports
+-   Exports results in multiple formats
 
 ---
 
@@ -283,28 +286,30 @@ This is the **recommended approach** for project submission:
 **What it does:**
 
 1. **Build Phase**
-   ```bash
-   docker build -t sts-solver .
-   ```
+
+    ```bash
+    docker build -t sts-solver .
+    ```
 
 2. **Execution Phase**
-   ```bash
-   docker run --rm \
-       -v $(pwd)/res:/app/res \
-       -v $(pwd)/solution_checker.py:/app/solution_checker.py \
-       sts-solver \
-       /bin/bash -c "
-           chmod +x /app/run_all.sh
-           /app/run_all.sh
-           uv run sts validate-all --official
-       "
-   ```
+
+    ```bash
+    docker run --rm \
+        -v $(pwd)/res:/app/res \
+        -v $(pwd)/solution_checker.py:/app/solution_checker.py \
+        sts-solver \
+        /bin/bash -c "
+            chmod +x /app/run_all.sh
+            /app/run_all.sh
+            uv run sts validate-all --official
+        "
+    ```
 
 3. **Output**
-   - All results saved to `./res/` directory
-   - Organized by approach: `res/CP/`, `res/SAT/`, `res/SMT/`, `res/MIP/`
-   - Analysis reports: `res/benchmark_analysis.json`, `res/benchmark_summary.csv`
-   - Validation report printed to console
+    - All results saved to `./res/` directory
+    - Organized by approach: `res/CP/`, `res/SAT/`, `res/SMT/`, `res/MIP/`
+    - Analysis reports: `res/benchmark_analysis.json`, `res/benchmark_summary.csv`
+    - Validation report printed to console
 
 ---
 
@@ -322,6 +327,7 @@ docker run --rm -it \
 ```
 
 Inside the container:
+
 ```bash
 # List available models/backends
 uv run sts list-models
@@ -383,6 +389,7 @@ wait
 **Problem:** Docker can't write to `./res/`
 
 **Solution:**
+
 ```bash
 # Create directory with proper permissions
 mkdir -p res/{CP,SAT,SMT,MIP}
@@ -400,6 +407,7 @@ docker run --rm --user $(id -u):$(id -g) \
 **Problem:** `minizinc: command not found`
 
 **Solution:** Rebuild the Docker image:
+
 ```bash
 docker build --no-cache -t sts-solver .
 ```
@@ -409,6 +417,7 @@ docker build --no-cache -t sts-solver .
 **Problem:** Solver times out before finding solution
 
 **Solution:** Increase timeout:
+
 ```bash
 docker run --rm -v $(pwd)/res:/app/res sts-solver \
     uv run sts solve 20 SMT --solver presolve_2 --timeout 600
@@ -419,6 +428,7 @@ docker run --rm -v $(pwd)/res:/app/res sts-solver \
 **Problem:** Docker container runs out of memory for large instances
 
 **Solution:** Increase Docker memory limit:
+
 ```bash
 docker run --rm -m 4g -v $(pwd)/res:/app/res sts-solver \
     uv run sts solve 24 MIP --solver optimized
@@ -429,6 +439,7 @@ docker run --rm -m 4g -v $(pwd)/res:/app/res sts-solver \
 **Problem:** Results disappear after container exits
 
 **Solution:** Ensure volume mounting is correct:
+
 ```bash
 # Use absolute path
 docker run --rm -v "$(pwd)/res:/app/res" sts-solver \
@@ -445,14 +456,14 @@ docker run --rm -v $(pwd)/res:/app/res sts-solver \
 
 Before submitting, verify Docker execution:
 
-- [ ] Docker image builds successfully
-- [ ] Can run individual solvers for each approach (CP, SAT, SMT, MIP)
-- [ ] `./docker_run.sh` completes without errors
-- [ ] Results are saved to `./res/` directory
-- [ ] All result files are valid JSON
-- [ ] Solutions pass validation checker
-- [ ] Analysis reports are generated
-- [ ] Can reproduce results on different machine
+-   [ ] Docker image builds successfully
+-   [ ] Can run individual solvers for each approach (CP, SAT, SMT, MIP)
+-   [ ] `./docker_run.sh` completes without errors
+-   [ ] Results are saved to `./res/` directory
+-   [ ] All result files are valid JSON
+-   [ ] Solutions pass validation checker
+-   [ ] Analysis reports are generated
+-   [ ] Can reproduce results on different machine
 
 ---
 
@@ -467,7 +478,7 @@ This Docker setup complies with all project requirements:
 ✅ **Free Software**: Uses only open-source tools (Z3, OR-Tools, MiniZinc)  
 ✅ **Documentation**: Complete instructions provided  
 ✅ **Results Format**: Saves to `res/` with correct JSON format  
-✅ **Validation**: Includes solution checker integration  
+✅ **Validation**: Includes solution checker integration
 
 ---
 
