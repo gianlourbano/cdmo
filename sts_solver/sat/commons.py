@@ -190,10 +190,12 @@ def totalizer_at_least_k(solver: Solver, literals: List[Any], k: int, prefix: st
         solver.add(BoolVal(False))
         return
 
-    sum_vars = _build_totalizer(solver, literals, prefix)
-    # sum_vars[k-1] represents sum >= k
-    if k > 0 and k-1 < len(sum_vars):
-        solver.add(sum_vars[k-1])
+    # sum_vars = _build_totalizer(solver, literals, prefix)
+    # # sum_vars[k-1] represents sum >= k
+    # if k > 0 and k-1 < len(sum_vars):
+    #     solver.add(sum_vars[k-1])
+    negated_literals = [Not(l) for l in literals]
+    totalizer_at_most_k(solver, negated_literals, n - k, prefix=f"{prefix}_neg")
 
 def totalizer_exactly_k(solver: Solver, literals: List[Any], k: int, prefix: str = ""):
     """Encodes Sum(literals) == k using Totalizer."""
