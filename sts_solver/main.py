@@ -224,7 +224,15 @@ def get_solvers_for_approach(approach: str) -> List[str]:
     if approach == "CP":
         return ["gecode", "chuffed"]
     elif approach == "SAT":
-        return ["z3"]
+        from .sat import solver as sat_solver_main 
+        from .sat.registry import get_registered_solvers
+        registered_solvers = get_registered_solvers()
+        sat_solvers = []
+        
+        for solver in registered_solvers:
+            sat_solvers.append(f"z3-{solver}")
+
+        return sat_solvers
     elif approach == "SMT": 
         return ["baseline", "optimized", "compact", "tactics"]
     elif approach == "MIP":
