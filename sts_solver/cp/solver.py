@@ -24,8 +24,8 @@ from ..utils.solution_format import STSSolution
 
 # ==== Old main style helpers (input & output handling) ====
 def circle_matchings(n: int) -> Dict[int, List[Tuple[int, int]]]:
-    pivot = n
-    circle = list(range(1, n))
+    #pivot, circle = n, list(range(1, n))
+    pivot, circle = n, list(range(2, n)) + [1]
     weeks = n - 1
     matchings: Dict[int, List[Tuple[int, int]]] = {}
     for w in range(1, weeks + 1):
@@ -99,6 +99,8 @@ def solve_cp_mzn(
         # Build matchings and week matrix; write stable dzn next to model (no temp model copy)
         matchings = circle_matchings(n)
         dzn_file = os.path.join("source", "CP", "circle_method.dzn")
+        if model_path.name.startswith("opt_"):
+            optimization = True
         generate_dzn(n, matchings, dzn_file)
         m = Model(str(model_path))
         s = Solver.lookup(backend)
@@ -109,6 +111,7 @@ def solve_cp_mzn(
             return STSSolution(time=timeout, optimal=False, obj=None, sol=[])
 
         results = inst.solve(timeout=timedelta(seconds=remaining), random_seed=42)
+        print("SOLVED")
         elapsed = int(time.time() - start)
 
         status = results.status
@@ -143,7 +146,7 @@ def solve_cp_mzn(
         if optimization:
             optimal_flag = status == Status.OPTIMAL_SOLUTION
         else:
-            optimal_flag = status == Status.SATISFIED
+            optimal_flag = False
 
         return STSSolution(time=min(elapsed, timeout), optimal=optimal_flag, obj=obj_val, sol=schedule_matrix)
     except Exception:
