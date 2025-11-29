@@ -78,4 +78,5 @@ constraint forall(t in Teams)(
 
 % --- END implicit constraints --
 
-solve :: int_search([period[i,j] | i,j in Teams where i<j], first_fail, indomain_random):: restart_geometric(1.5, 100) satisfy;
+
+solve :: int_search([period[i,j] | i,j in Teams where i<j], first_fail, indomain_min):: restart_geometric(1.5, 100) satisfy;
