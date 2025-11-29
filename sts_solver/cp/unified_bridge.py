@@ -38,8 +38,7 @@ def _register_cp_models() -> None:
 
             def _solve_model(self, model: Any) -> STSSolution:
                 backend = getattr(self, "backend", "gecode")
-                strategy = getattr(self, "search_strategy", None)
-                return solve_cp_mzn(self._model_path, self.n, backend, self.timeout, search_strategy=strategy)
+                return solve_cp_mzn(self._model_path, self.n, backend, self.timeout, search_strategy=None)
 
             @classmethod
             def get_metadata(cls) -> SolverMetadata:

@@ -42,18 +42,5 @@ class SolverRegistry:
             result[a] = {name: cls.get_metadata() for name, cls in solvers.items()}
         return result
 
-    def find_best_solver(self, approach: str, n: int, optimization: bool = False) -> Optional[str]:
-        print("CALLED THIS UGLY MF")
-        names: List[str] = []
-        for name, cls in self._solvers.get(approach, {}).items():
-            md = cls.get_metadata()
-            if optimization and not md.supports_optimization:
-                continue
-            if md.max_recommended_size and n > md.max_recommended_size:
-                continue
-            names.append(name)
-        return names[0] if names else None
-
-
 # Global registry instance
 registry = SolverRegistry()

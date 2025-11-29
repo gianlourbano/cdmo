@@ -18,7 +18,6 @@ from ..utils import validate_instance_size
 @click.argument("approach", type=click.Choice(["CP", "SAT", "SMT", "MIP"]))
 @click.option("--model", "-m", help="Model (formulation) name registered for the approach")
 @click.option("--solver", "-s", help="Backend only (CP: gecode/chuffed, MIP: CBC/SCIP/...) — not a model")
-@click.option("--search-strategy", help="CP only: search strategy (e.g. ff_luby, ff_geometric, plain)")
 @click.option("--timeout", "-t", type=int, default=None, help="Timeout in seconds (defaults from config)")
 @click.option("--output", "-o", type=click.Path(), help="Output directory (defaults from config)")
 @click.option("--optimization", is_flag=True, help="Enable optimization objective if supported")
@@ -32,7 +31,6 @@ def solve(
     output: Optional[str],
     optimization: bool,
     name: Optional[str],
-    search_strategy: Optional[str] = None,
 ):
     """Solve STS instance with N teams using specified approach (modular CLI)."""
 
@@ -70,7 +68,7 @@ def solve(
     if solver and approach in {"MIP", "CP"}:
         backend = solver
 
-    chosen_model = raw_model or registry.find_best_solver(approach, n, optimization)
+    chosen_model = raw_model
     if not chosen_model:
         click.echo(f"Error: No suitable model found for {approach}. Use --model to choose.", err=True)
         raise SystemExit(1)
@@ -83,10 +81,8 @@ def solve(
     start_time = time.time()
     # Pass search strategy dynamically by setting attribute (used in CP path)
     instance = solver_cls(n, effective_timeout, optimization)
-    if approach == "CP" and search_strategy:
-        setattr(instance, "search_strategy", search_strategy)
     # Attach backend if supported.
-    if backend and hasattr(instance, "backend"):
+    if backend:
         setattr(instance, "backend", backend)  # type: ignore[attr-defined]
 
     with handle_solver_errors(rethrow=False):

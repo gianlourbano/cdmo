@@ -196,6 +196,7 @@ def solve_cp_decisional(n, timeout, solver, search_strategy="base", symmetry_bre
             'optimal': False,
             'time': solve_time
         }
+
     return result
 
 def solve_cp_optimization(n, timeout, solver, search_strategy="base", symmetry_breaking=True):
@@ -241,6 +242,7 @@ def solve_cp_optimization(n, timeout, solver, search_strategy="base", symmetry_b
             'optimal': False,
             'time': solve_time
         }
+    print(result)
     return result
  
 def main():
@@ -269,7 +271,7 @@ def main():
     parser.add_argument(
         "-ss", "--search_strategy",
         type=str,
-        choices=["base", "base_modified", "modified_new_sb","wd_random", "dwd_r_Luby", "dwd_r_rr", "ff_split", "ro_luby"],
+        choices=["base", "implicit", "base_modified", "modified_new_sb","wd_random", "dwd_r_Luby", "dwd_r_rr", "ff_split", "ro_luby"],
         default="base",
         nargs="+",
         help="The search strategy to use (base, dwd_random, dwd_r_Luby, dwd_r_rr, ff_split, ro_luby)."
@@ -332,7 +334,7 @@ def main():
                             ("chuffed", "base", "N"),
                             ("chuffed", "ff_split", "Y"),
                             ("chuffed", "ro_Luby", "Y"),
-                            ("chuffed", "modified_new_sb", "Y")]
+                            ("chuffed", "implicit", "Y")]
     if args.all:
         solving_combinations = allowed_combinations
     else:
@@ -364,7 +366,7 @@ def main():
                         save_results_as_json(n, model_name=model_name, results=results)
                     if results['sol']:
                         print(f"\n[Decisional Result] n={n} | time={results['time']}")
-                        # human_readable_schedule(results['sol'])
+                        human_readable_schedule(results['sol'])
                     else:
                         print(f"[!] No solution found for n={n}")
 
