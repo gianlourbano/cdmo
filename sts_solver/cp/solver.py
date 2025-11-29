@@ -23,9 +23,11 @@ from minizinc.result import Status
 from ..utils.solution_format import STSSolution
 
 # ==== Old main style helpers (input & output handling) ====
-def circle_matchings(n: int) -> Dict[int, List[Tuple[int, int]]]:
-    #pivot, circle = n, list(range(1, n))
-    pivot, circle = n, list(range(2, n)) + [1]
+def circle_matchings(n: int, opt: bool) -> Dict[int, List[Tuple[int, int]]]:
+    if (opt):
+        pivot, circle = n, list(range(2, n)) + [1]
+    else:
+        pivot, circle = n, list(range(1, n))
     weeks = n - 1
     matchings: Dict[int, List[Tuple[int, int]]] = {}
     for w in range(1, weeks + 1):
@@ -96,11 +98,12 @@ def solve_cp_mzn(
             raise FileNotFoundError(f"MiniZinc model not found: {model_path}")
 
         import os
-        # Build matchings and week matrix; write stable dzn next to model (no temp model copy)
-        matchings = circle_matchings(n)
-        dzn_file = os.path.join("source", "CP", "circle_method.dzn")
         if model_path.name.startswith("opt_"):
             optimization = True
+        # Build matchings and week matrix; write stable dzn next to model (no temp model copy)
+        matchings = circle_matchings(n, optimization)
+        dzn_file = os.path.join("source", "CP", "circle_method.dzn")
+        
         generate_dzn(n, matchings, dzn_file)
         m = Model(str(model_path))
         s = Solver.lookup(backend)
