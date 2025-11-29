@@ -93,6 +93,8 @@ def solve(
     # to avoid overwriting non-optimized runs. If a custom --name is provided, respect it.
     is_opt_model = isinstance(chosen_model, str) and chosen_model.lower().startswith("opt_")
     result_name = name or (f"opt-{chosen_model}" if (optimization or is_opt_model) else chosen_model)
+    if backend:
+        result_name = f"{result_name}-{backend}"
     save_results(n, approach, {result_name: result}, output_dir)
 
     click.echo(f"Solution completed in {time.time() - start_time:.2f}s")
