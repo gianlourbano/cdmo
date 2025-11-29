@@ -1,0 +1,178 @@
+{
+  "base-chuffed": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "base_SB-chuffed": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "base_SB_implicit-chuffed": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "base_SB-gecode": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "base_SB_implicit-gecode": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "base-gecode": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "base_SB_implicit_ff-chuffed": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "base_SB_implicit_ff-gecode": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "base_SB_implicit_ff_luby-chuffed": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "base_SB_implicit_ff_geometric-chuffed": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "base_SB_implicit_ff_geometric-gecode": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "base_SB_implicit_ff_luby-gecode": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-opt_base-gecode": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-opt_base_SB-gecode": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-opt_base_SB_implicit-gecode": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-opt_base_SB_implicit_rr-gecode": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-opt_base-chuffed": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-opt_base_SB-chuffed": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-opt_base_SB_implicit-chuffed": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-opt_base_SB_implicit_rr-chuffed": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-opt_base_SB_implicit_luby-gecode": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-opt_base_SB_implicit_luby-chuffed": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  }
+}
