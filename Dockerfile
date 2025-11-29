@@ -1,5 +1,17 @@
 # Multi-stage Docker build for STS solver using Astral UV images
-FROM astral/uv:python3.12-bookworm-slim AS base
+FROM minizinc/minizinc:edge-jammy AS base
+
+RUN apt-get update && apt-get install -y \
+    libc6-dev wget curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+ADD https://astral.sh/uv/install.sh /uv-installer.sh
+
+# Run the installer then remove it
+RUN sh /uv-installer.sh && rm /uv-installer.sh
+
+# Ensure the installed binary is on the `PATH`
+ENV PATH="/root/.local/bin/:$PATH"
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
@@ -19,17 +31,21 @@ COPY run_all.sh ./
 RUN uv sync
 
 # Install additional OR-Tools dependencies
-RUN apt-get update && apt-get install -y \
-    libc6-dev wget \
-    && rm -rf /var/lib/apt/lists/*
 
-# Install MiniZinc
-RUN wget https://github.com/MiniZinc/MiniZincIDE/releases/download/2.7.5/MiniZincIDE-2.7.5-bundle-linux-x86_64.tgz \
-    && tar -xzf MiniZincIDE-2.7.5-bundle-linux-x86_64.tgz \
-    && mv MiniZincIDE-2.7.5-bundle-linux-x86_64 /opt/minizinc \
-    && ln -s /opt/minizinc/bin/minizinc /usr/local/bin/minizinc \
-    && ln -s /opt/minizinc/bin/mzn2fzn /usr/local/bin/mzn2fzn \
-    && rm MiniZincIDE-2.7.5-bundle-linux-x86_64.tgz
+
+# Install MiniZinc bundle (amd64/x86_64) at a modern version
+# Force amd64 userspace to avoid architecture mismatches
+# ARG MINIZINC_VERSION=2.9.3
+# RUN set -eux; \
+#     dpkg --print-architecture | grep -q amd64 || (echo "This image must be built for amd64" && exit 1); \
+#     url="https://github.com/MiniZinc/MiniZincIDE/releases/download/${MINIZINC_VERSION}/MiniZincIDE-${MINIZINC_VERSION}-bundle-linux-x86_64.tgz"; \
+#     curl -fL "$url" -o /tmp/minizinc.tgz; \
+#     tar -xzf /tmp/minizinc.tgz -C /opt; \
+#     dir=$(tar -tzf /tmp/minizinc.tgz | head -1 | cut -d/ -f1); \
+#     mv "/opt/$dir" /opt/minizinc; \
+#     ln -sf /opt/minizinc/bin/minizinc /usr/local/bin/minizinc; \
+#     ln -sf /opt/minizinc/bin/mzn2fzn /usr/local/bin/mzn2fzn; \
+#     rm -f /tmp/minizinc.tgz
 
 # Create results directory
 RUN mkdir -p res/{CP,SAT,SMT,MIP}
