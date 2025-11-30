@@ -240,20 +240,71 @@ The strategy to break the home/away reflection symmetry differs depending on the
 \end{table}
 
 \section{SAT Model}
-% Mandatory for groups of 4. Groups of <=3 choose SAT or SMT (bonus for both)[cite: 53].
+
+\subsection{Overview and Strategy}
+Consistent with the project-wide decomposition, we use the \textit{Circle Method} (Section 1.2) to fix the weekly matches, yielding the matrix $W$. The SAT model therefore decides only: (i) the \textit{period assignment} of each pre-determined match; and (ii) its \textit{home/away} orientation. Structural constraints are encoded with Boolean variables and cardinality encodings.
 
 \subsection{Decision variables}
-% Describe literals and semantics (e.g., $\Delta_{i,j} = true$ iff...)[cite: 55, 56].
+Given teams $\mathcal{T}=\{1,\dots,n\}$, weeks $\mathcal{W}=\{1,\dots,n-1\}$, and periods $\mathcal{P}=\{1,\dots,n/2\}$, we introduce:
+\begin{itemize}
+    \item $mp_{i,j,p}$: Boolean channel of the integer period variable $\pi_{ij}$ (Section 1). For $i<j$ and $p\in\mathcal{P}$, $mp_{i,j,p}=\texttt{true}$ iff match $\{i,j\}$ (whose week $w=W_{ij}$ is fixed by preprocessing) is played in period $p$.
+    \item $h_{i,j}$: for $i<j$, $h_{i,j}=\texttt{true}$ iff team $i$ plays Home against $j$ (thus $h_{j,i}=\lnot h_{i,j}$ by reciprocity).
+\end{itemize}
+To exploit the \textit{Deficient Teams} structure (Section 1.3), we also use:
+\begin{itemize}
+    \item $def_{t,p}$: $\texttt{true}$ iff team $t$ is \emph{deficient} in period $p$, i.e., it plays exactly one match in period $p$ over the whole tournament.
+\end{itemize}
 
 \subsection{Objective function}
-% Explain how optimization is managed in SAT[cite: 58].
+Optimization is handled by a binary search on the imbalance variable $\beta$ (Section 1). For a fixed candidate bound $\beta$, each team $t$ must satisfy:
+\[
+\Big\lceil\tfrac{(n-1)-\beta}{2}\Big\rceil \;\le\; \sum_{j\ne t} \mathbb{I}(t \text{ plays Home vs } j) \;\le\; \Big\lfloor\tfrac{(n-1)+\beta}{2}\Big\rfloor.
+\]
+We iteratively solve SAT decision problems, tightening the bound until minimal $\beta$ is found.
 
 \subsection{Constraints}
-% Describe clauses and encoding used[cite: 61].
+\paragraph{Main constraints.}
+\begin{enumerate}
+    \item \textbf{Unique period assignment:} each match $\{i,j\}$ is assigned to exactly one period:
+    \[\sum_{p\in\mathcal{P}} mp_{i,j,p} = 1.\]
+    Implemented with Exactly-One (pairwise) clauses.
 
-\subsection{Validation}
-% Use at least Z3. Bonus for Dimacs/solver-independent language[cite: 65].
-% Include Experimental Design and Results Table here as well.
+    \item \textbf{Slot capacity:} for every week $w$ and period $p$, exactly one match of week $w$ occupies period $p$:
+    \[\sum_{\{i,j\}\in M_w} mp_{i,j,p} = 1 \quad (w\in\mathcal{W},\ p\in\mathcal{P}).\]
+    Encoded with Exactly-One (pairwise) clauses.
+
+    \item \textbf{Per-team per-period cap:} each team appears in at most 2 matches in the same period across the season:
+    \[\sum_{j\ne t} mp_{t,j,p} \le 2 \quad (t\in\mathcal{T},\ p\in\mathcal{P}).\]
+    Encoded with At-Most-2 (pairwise) clauses.
+\end{enumerate}
+
+\paragraph{Implied constraints (Deficient Teams).}
+Using $def_{t,p}$ to capture deficiency:
+\begin{enumerate}
+    \item \textbf{Definition:}
+    \[
+    def_{t,p} \iff \Big(\sum_{j\ne t} mp_{t,j,p} = 1\Big).
+    \]
+    Implemented by implications enforcing at-least-one and not-at-least-two; at-least-three is excluded by the main cap.
+
+    \item \textbf{Exactly two deficient per period:}
+    \[\sum_{t\in\mathcal{T}} def_{t,p} = 2 \quad (p\in\mathcal{P}).\]
+    Encoded with an Exactly-$k$ Totalizer.
+
+    \item \textbf{At most one deficient period per team:}
+    \[\sum_{p\in\mathcal{P}} def_{t,p} \le 1 \quad (t\in\mathcal{T}).\]
+    Encoded with At-Most-1 (pairwise) clauses.
+\end{enumerate}
+
+\paragraph{Symmetry breaking.}
+We reduce residual symmetries via:
+\begin{enumerate}
+    \item \textbf{Home/Away symmetry:} fix Team 1's orientation pattern along weeks: it plays Home in the first $\lfloor (n-1)/2\rfloor$ matches and Away thereafter (ordered by week), anchoring the global flip.
+    \item \textbf{Period lexicographic ordering:} periods are interchangeable; we impose a lexicographic order on the vectors $\operatorname{Vector}(p) = \langle mp_{i,j,p}\rangle_{\{i,j\}\in M_1\cup\cdots\cup M_{n-1}}$ so that $\operatorname{Vector}(p) \le_{lex} \operatorname{Vector}(p+1)$ for $p=1,\dots,|\mathcal{P}|-1$.
+\end{enumerate}
+
+\subsection{Validation and Results}
+We use \texttt{Z3} via its Python API to solve the SAT encodings. Decision and optimization results (times and objectives) are those reported in our SAT study; tables and per-encoding comparisons are consistent with the standalone SAT write-up and are omitted here for brevity.
 
 \section{SMT Model}
 % Mandatory for groups of 4. Groups of <=3 choose SAT or SMT (bonus for both)[cite: 68].
