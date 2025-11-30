@@ -700,7 +700,16 @@ $n$ & Direct MIP & Presolve MIP & Speedup \\
 These results show that fixing $W$ and only assigning periods yields large speedups, smaller models, and near-optimal balance in the optimization variant.
 
 \section{Conclusions}
-% Brief concluding remarks[cite: 95].
+These results show that fixing $W$ and only assigning periods yields large speedups, smaller models, and near-optimal balance in the optimization variant.
+
+In this work, we tackled the Sports Tournament Scheduling problem by comparing Constraint Programming, SAT, SMT, and Mixed-Integer Programming. The cornerstone of our approach was the decomposition strategy based on the Circle Method, which drastically reduced the combinatorial search space by statically fixing the weekly schedule.
+Experimental results highlighted that:
+\begin{itemize}
+    \item In \textbf{CP}, the use of Lazy Clause Generation (Chuffed) combined with symmetry breaking proved superior to standard search.
+    \item In \textbf{SAT} and \textbf{SMT}, the explicit encoding of the \textit{Deficient Teams} invariant was the decisive factor in proving optimality for larger instances ($n \ge 20$).
+    \item In \textbf{MIP}, the decomposition strategy was transformative, yielding speedups of over $90\times$ compared to the monolithic formulation.
+\end{itemize}
+Overall, the project demonstrates that hybridizing domain-specific theoretical properties with structural decomposition is more effective than relying solely on raw solver power.
 
 \section*{Authenticity and Author Contribution Statement}
 % Declare work is your own. Cite ideas taken from others[cite: 97, 98].
