@@ -712,9 +712,15 @@ Experimental results highlighted that:
 Overall, the project demonstrates that hybridizing domain-specific theoretical properties with structural decomposition is more effective than relying solely on raw solver power. Ultimately, the SMT approach emerged as the best performing method, demonstrating superior scalability by solving the largest decision instances (up to $n=26$) within the time limit, outperforming SAT, CP, and MIP.
 
 \section*{Authenticity and Author Contribution Statement}
-% Declare work is your own. Cite ideas taken from others[cite: 97, 98].
-% AI usage must be disclosed and referenced[cite: 99, 100].
-% Describe each author's contribution[cite: 101].
+	\textbf{Authenticity:} This report and the accompanying source code are the original work of the authors named on the title page. Where external ideas, datasets, libraries, or prior results have been used, they are cited in the bibliography and acknowledged in the code or documentation.
+
+	\textbf{Use of AI tools:} We employed AI assistants (GitHub Copilot, GPT-5) to accelerate routine tasks such as refactoring Python scripts, drafting section outlines, formatting LaTeX tables, and generating shell scaffolding. All core modeling choices (formalization, constraints, encodings, and objectives), solver-specific implementations (CP, SAT, SMT, MIP), and experimental designs were conceived, implemented, and validated by the authors.
+	\textbf{Author contributions:}
+\begin{itemize}
+    \item Gianlorenzo Urbano: Common formalization; MIP and SMT implementations; presolve design and validation; integration of results into the report; experimental orchestration and reproducibility scripts.
+    \item Luca Lucioli: Common formalization; SAT encodings (pairwise, totalizer, sequential counter, Heule); symmetry breaking design; DT implied constraints in SAT; consolidation of decisional/optimization results.
+    \item Michelangelo Urbano: Common formalization; CP formulations and backend configuration; optimization objective linearization and analysis;.
+\end{itemize}
 
 \begin{thebibliography}{9}
 % List references here[cite: 103].
