@@ -66,12 +66,12 @@ class SATSmartSBDTSolver(_SATSmartSBDTSolver):
     """Registry wrapper for smart with symmetry breaking and deficient teams native SAT solver."""
     pass
 
-@registry.register("SAT", "pairwise_sb_dt")
-class SATPairwiseSBDTSolver(_SATPairwiseSBDTSolver):
-    """Registry wrapper for pairwise with symmetry breaking and deficient teams native SAT solver."""
-    pass
+# @registry.register("SAT", "pairwise_sb_dt")
+# class SATPairwiseSBDTSolver(_SATPairwiseSBDTSolver):
+#     """Registry wrapper for pairwise with symmetry breaking and deficient teams native SAT solver."""
+#     pass
 
-@registry.register("SAT", "pairwise_dt")
-class SATPairwiseDTSolver(_SATPairwiseDTSolver):
-    """Registry wrapper for pairwise with deficient teams native SAT solver."""
-    pass
+# @registry.register("SAT", "pairwise_dt")
+# class SATPairwiseDTSolver(_SATPairwiseDTSolver):
+#     """Registry wrapper for pairwise with deficient teams native SAT solver."""
+#     pass

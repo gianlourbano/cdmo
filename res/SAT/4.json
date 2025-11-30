@@ -1,0 +1,130 @@
+{
+  "opt-smart": {
+    "time": 0,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-smart_dt": {
+    "time": 0,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-smart_sb": {
+    "time": 0,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-smart_sb_dt": {
+    "time": 0,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-vanilla_heule": {
+    "time": 0,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-vanilla_pairwise": {
+    "time": 0,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-vanilla_sequential": {
+    "time": 0,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-vanilla_totalizer": {
+    "time": 0,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "smart": {
+    "time": 0,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "smart_dt": {
+    "time": 0,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "smart_sb": {
+    "time": 0,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "smart_sb_dt": {
+    "time": 0,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "vanilla_heule": {
+    "time": 0,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "vanilla_pairwise": {
+    "time": 0,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "vanilla_sequential": {
+    "time": 0,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "vanilla_totalizer": {
+    "time": 0,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  }
+}

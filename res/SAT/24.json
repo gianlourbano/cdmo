@@ -1,0 +1,66 @@
+{
+  "smart": {
+    "time": 300,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "smart_dt": {
+    "time": 300,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "smart_sb": {
+    "time": 300,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "smart_sb_dt": {
+    "time": 300,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "vanilla_heule": {
+    "time": 300,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "vanilla_pairwise": {
+    "time": 300,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "vanilla_sequential": {
+    "time": 300,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "vanilla_totalizer": {
+    "time": 300,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  }
+}
