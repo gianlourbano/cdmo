@@ -202,6 +202,63 @@ def totalizer_exactly_k(solver: Solver, literals: List[Any], k: int, prefix: str
     totalizer_at_most_k(solver, literals, k, prefix=f"{prefix}_le")
     totalizer_at_least_k(solver, literals, k, prefix=f"{prefix}_ge")
 
+
+
+# --- Smart dispatcher ---
+def smart_at_most_k(solver: Solver, literals: List[Any], k: int, prefix: str = ""):
+    """
+    Selects the most efficient encoding based on N (len(literals)) and k.
+    """
+    n = len(literals)
+    if n <= k: return # Trivial
+
+    # Case 1: Exactly/At Most One (Very common in STS)
+    if k == 1:
+        # Pairwise is best for propagation but O(N^2) clauses.
+        # Threshold: ~12-15 variables is usually safe for Pairwise.
+        if n <= 14 or n >= 20:
+            at_most_1_pairwise(solver, literals)
+        else:
+            # For larger N, Sequential uses fewer clauses O(N) but adds vars.
+            # Totalizer is overkill for k=1.
+            sequential_at_most_k(solver, literals, 1, prefix)
+            
+    # Case 2: Small k (e.g. k=2 for "at most 2 games in period")
+    elif k <= 3:
+        # Pairwise is O(N^(k+1)), too expensive for N > 8 roughly.
+        if n <= 8 or n >= 20:
+            # Explicit exclusion still has strong propagation
+            if k == 2: at_most_2_pairwise(solver, literals)
+            else: sequential_at_most_k(solver, literals, k, prefix)
+        else:
+            # Sequential is robust here
+            sequential_at_most_k(solver, literals, k, prefix)
+            
+    # Case 3: Large k or Optimization Context
+    else:
+        # Totalizer provides Arc Consistency and is efficient for 
+        # bounds that might change or are large.
+        totalizer_at_most_k(solver, literals, k, prefix)
+
+def smart_exactly_k(solver: Solver, literals: List[Any], k: int, prefix: str = ""):
+    """
+    Seleziona l'encoding migliore per vincoli di cardinalità esatta.
+    """
+    n = len(literals)
+    
+    if k == 1:
+        if n <= 14:
+            exactly_1_pairwise(solver, literals)
+        # Exactly-One è il vincolo più frequente. Pairwise è il più veloce a propagare.
+        # Per N molto grandi (>20-24), potremmo considerare Heule, ma per ora Pairwise è sicuro.
+        else:
+            sequential_at_most_k(solver, literals, 1, prefix)
+            at_least_1(solver, literals)
+    else:
+        # Per k > 1, Totalizer è superiore perché gestisce entrambi i bound (<= k e >= k)
+        # con la stessa struttura ad albero.
+        totalizer_exactly_k(solver, literals, k, prefix)
+
 # --- Symmetry Breaking ---
 
 def lex_lesseq(solver: Solver, list1: List[Any], list2: List[Any], prefix: str = ""):
