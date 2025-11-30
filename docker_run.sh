@@ -8,16 +8,6 @@ set -e
 IMAGE_NAME="sts-solver"
 CONTAINER_NAME="sts-experiment"
 
-echo "======================================"
-echo "STS Docker Runner"
-echo "======================================"
-
-# Build Docker image
-echo "Building Docker image..."
-docker build -t $IMAGE_NAME .
-
-echo "✓ Docker image built successfully"
-
 # Run the container with volume mounting for results
 echo ""
 echo "Running experiments in Docker container..."

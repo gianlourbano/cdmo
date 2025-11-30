@@ -3,6 +3,8 @@
 To run all models with docker, use the following command:
 
 ```bash
+chmod +x build-image.sh
+./build-image.sh
 chmod +x docker_run.sh
 ./docker_run.sh
 ```
@@ -13,13 +15,13 @@ To run a single model, use:
 
 ```bash
 chmod +x run.sh
-run.sh <n> <approach> --model <model_name> [--solver <solver_name>] [--optimization]
+./run.sh <n> <approach> --model <model_name> [--solver <solver_name>] [--optimization]
 ```
 
 For instance,
 
 ```bash
-run.sh 26 SMT --model presolve_2 --optimization
+./run.sh 26 SMT --model presolve_2 --optimization
 ```
 
 The solver option is only available for CP.
