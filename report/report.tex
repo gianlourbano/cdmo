@@ -215,31 +215,113 @@ The strategy to break the home/away reflection symmetry differs depending on the
 \textit{Implementation:} These constraints are implemented as direct equality assignments on the $h_{ij}$ variables.
 
 
-
 \subsection{Validation}
-% Implement in MiniZinc, run with at least Gecode[cite: 32].
 
-\subsubsection*{Experimental design}
-% Detail hardware, software, time limits, and strategies used. Results must be reproducible[cite: 37, 38].
+The CP model was implemented in MiniZinc and executed using the Python \texttt{minizinc} library to automate the generation of instances and the collection of results.
+\subsubsection{Experimental Design}
+To ensure the reproducibility and reliability of our results, the experimental study was conducted according to the following setup:
 
-\subsubsection*{Experimental results}
-% Mandatory table format[cite: 41]. 
-% Bold = Optimal. UNSAT = Unsatisfiable. N/A or - = Time limit [cite: 48-50].
+\begin{itemize}
+    \item Hardware and Software Environment: All experiments were performed inside a Docker container to guarantee a consistent execution environment. The host machine was a MacBook M1 PRO. The software stack included MiniZinc 2.9.4 and Python 3.12.
+    \item Timeout: A strict time limit of 300 seconds (5 minutes) was imposed for each run. If a solver failed to find a solution (or prove optimality) within this limit, the execution was terminated, and the best solution found so far (if any) was recorded.
+    \item Input Generation: The instance data (specifically the week matrix $W$) was generated dynamically using the Circle Method algorithm implemented in Python and passed to the MiniZinc model via a temporary \texttt{.dzn} file.
+    \item Reproducibility: To ensure deterministic behavior, the random seed for the solvers was fixed to 42.
+\end{itemize} We evaluated the performance of our model using two distinct solvers: Gecode (standard finite domain solver) and Chuffed (lazy clause generation solver).
+To assess the impact of our modeling choices, we defined three incremental model configurations:
+\begin{enumerate}
+    \item Base: Includes only the Main Constraints (Section 2.3.1).
+    \item Base\_SB: Adds the Symmetry Breaking constraints (Section 2.3.2).
+    \item Base\_SB\_implicit: The complete model, including Implied constraints (Section 2.3.3).
+\end{enumerate}
+
+For the Decision Problem, we experimented with the following search strategies on the complete model:
+\begin{itemize}
+    \item Default solver search strategy.
+    \item ff (\textit{First-Fail} heuristic): Select the variable with the smallest domain size and assigning the minimum value first.
+    \item ff\_geometric: We apply a \textit{Geometric restart} policy (scale factor $1.5$, base $100$) combined with the \textit{First-Fail} variable selection and indomain\_min value selection.
+    \item ff\_luby: We apply a \textit{Luby restart} sequence (scale factor $100$) with the\textit{First-Fail} variable selection and indomain\_min value selection.
+\end{itemize}
+
+For the Optimization Problem, we tested:
+\begin{itemize}
+    \item luby: A complete search using \textit{First-Fail} on all variables combined with \textit{Luby restarts} (scale factor 50).
+    \item rr: A \textit{Large Neighborhood Search} (LNS) approach. We utilize the \textit{Relax-and-Reconstruct} meta-heuristic (fixing 85\% of variables and re-solving). The variable selection relies on \textit{dom/wdeg} (domain size divided by weighted degree) to prioritize hard-to-satisfy constraints.
+\end{itemize}
+For the sake of brevity, we omit detailed results for other solver configurations tested during the preliminary phase that yielded inferior performance.
+Regarding search heuristics, we evaluated the input\_order variable selection (lexicographic) and indomain\_random value selection; however, both strategies resulted in significantly larger search trees compared to the first\_fail principle, failing to converge on valid solutions for instances with $n > 14$.
+
+\subsubsection{Experimental results}
+The results are reported in the following tables. We evaluate the progressive impact of our modeling choices (\textit{Base} $\to$ \textit{Base\_SB} $\to$ \textit{Base\_SB\_implicit}) and the effectiveness of the search strategies defined in the previous section.
+
+\paragraph{Decision Problem.}
+Table \ref{tab:dec_results} details the runtime (in seconds) for all tested configurations.
+We compare the default search strategy on the incremental models against the specific strategies (ff, ff\_geometric, ff\_luby) applied to the complete model (\textit{Base\_SB\_implicit}).
 
 \begin{table}[h]
     \centering
-    \begin{tabular}{lcccc}
+    \tiny  % Necessary to fit all columns
+    \setlength{\tabcolsep}{1.5pt} % Minimal spacing
+    \begin{tabular}{l|cccccc|cccccc}
         \toprule
-        \textbf{ID} & \textbf{Appr. 1 (e.g., Chuffed)} & \textbf{Appr. 2 (e.g., Gecode)} & \textbf{...} & \textbf{...} \\
+        & \multicolumn{6}{c|}{\textbf{Gecode}} & \multicolumn{6}{c}{\textbf{Chuffed}} \\
+        \textbf{ID} 
+        & Base & Base\_SB & Imp & ff & ff\_geo & ff\_luby 
+        & Base & Base\_SB & Imp & ff & ff\_geo & ff\_luby \\
         \midrule
-        1 & \textbf{100} & 120 & 80 & - \\
-        2 & 50 & 60 & N/A & N/A \\
-        3 & UNSAT & UNSAT & N/A & N/A \\
+        04 & UNSAT & UNSAT & UNSAT & UNSAT & UNSAT & UNSAT & UNSAT & UNSAT & UNSAT & UNSAT & UNSAT & UNSAT \\
+        06 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        08 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0\\
+        10 & 0 & 0 & 0 & 0 & 1 & 2 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        12 & 0 & 0 & 0 & 0 & 2 & 11 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        14 & 132 & 6 & 56 & 75 & 259 & - & 12 & 0 & 0 & 1 & 1 & 2 \\
+        16 & - & - & - & - & - & - & 7 & 13 & 26 & 6 & 8 & 7 \\
+        18 & - & - & - & - & - & - & - & - & 4 & 31 & 29 & 30 \\
+        20 & - & - & - & - & - & - & - & - & 14 & - & - & -\\
         \bottomrule
     \end{tabular}
-    \caption{Experimental results showing runtime (s) or best objective value.}
-    \label{tab:cp_results}
+    \caption{Runtime (s) for the Decision Problem. Columns ``Imp'' refer to Base\_SB\_implicit with default search. Columns ``ff'', ``ff\_geo'', ``ff\_luby'' refer to Base\_SB\_implicit with the respective strategy.}
+    \label{tab:dec_results}
 \end{table}
+
+\paragraph{Optimization Problem.}
+Table \ref{tab:opt_results} reports the best objective value ($\beta$) found within the 300s time limit. We compare the default search on the incremental models against the \textit{luby} and \textit{rr} strategies on the complete model.
+\begin{table}[h]
+    \centering
+    \tiny % Font size
+    \setlength{\tabcolsep}{2pt}
+    \begin{tabular}{l|ccccc|ccccc}
+        \toprule
+        & \multicolumn{5}{c|}{\textbf{Gecode}} & \multicolumn{5}{c}{\textbf{Chuffed}} \\
+        \textbf{ID} 
+        & Base & Base\_SB & Imp & luby & rr 
+        & Base & Base\_SB & Imp & luby & rr \\
+        \midrule
+        04 & UNSAT & UNSAT & UNSAT & UNSAT & UNSAT & UNSAT & UNSAT & UNSAT & UNSAT & UNSAT \\
+        06 & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} \\
+        08 & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} \\
+        10 & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} \\
+        12 & 3 & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} \\
+        14 & 3 & \textbf{1} & \textbf{1} & - & \textbf{1} & \textbf{1} & \textbf{1} & \textbf{1} & - & \textbf{1} \\
+        16 & - & - & - & - & - & - & \textbf{1} & \textbf{1} & - & \textbf{1}  \\
+        18 & - & - & - & - & - & - & 11 & \textbf{1} & - & \textbf{1} \\
+        20 & - & - & - & - & - & - & - & - & - & -  \\
+        \bottomrule
+    \end{tabular}
+    \caption{Best Total Imbalance ($\beta$) found. Columns ``luby'' and ``rr'' use the complete model Base\_SB\_implicit.}
+    \label{tab:opt_results}
+\end{table}\paragraph{Discussion of Results.}The experimental evidence highlights a significant performance gap between the two solvers, with Chuffed strictly outperforming Gecode across both decision and optimization tasks.
+
+Regarding the Decision Problem (Table \ref{tab:dec_results}):
+\begin{itemize}
+    \item Solver Performance: Chuffed demonstrates superior scalability, solving instances up to $n=20$ (with Implied constraints), whereas Gecode fails to converge for any instance larger than $n=14$. 
+    \item Impact of Constraints: Symmetry Breaking (SB) is crucial for performance. In Gecode ($n=14$), adding SB reduces runtime from 132s to 6s. The Implied constraints (Imp) prove essential for the hardest solved instance: Chuffed solves $n=20$ in 14s only with the Implied model, failing ("-") with lighter configurations.
+    \item Search Strategies: The default solver search strategy generally outperforms the manual first\_fail heuristic and restart-based strategies (geo, luby). This is evident in Chuffed for $n=20$, where the default search converges in 14s, while the other search strategies fail to find a solution within the time limit.
+\end{itemize}Regarding the Optimization Problem (Table \ref{tab:opt_results}):
+\begin{itemize}
+    \item Optimality: Chuffed proves optimality up to $n=18$, while Gecode is limited to $n=14$.
+ \item Strategies: The Large Neighborhood Search strategy (\texttt{rr}) proved highly effective, enabling Chuffed to prove optimality for instances up to $n=18$. In stark contrast, the complete search with Luby restarts (\texttt{luby}) exhibited significantly poorer scalability: it failed to prove optimality for $n \ge 14$. 
+\end{itemize}
+
 
 \section{SAT Model}
 
