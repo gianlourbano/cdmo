@@ -149,7 +149,7 @@ def solve_cp_mzn(
         if optimization:
             optimal_flag = status == Status.OPTIMAL_SOLUTION
         else:
-            optimal_flag = False
+            optimal_flag = status == Status.SATISFIED
 
         return STSSolution(time=min(elapsed, timeout), optimal=optimal_flag, obj=obj_val, sol=schedule_matrix)
     except Exception:
