@@ -1,5 +1,5 @@
 {
-  "base_SB_implicit": {
+  "base_SB_implicit-chuffed": {
     "time": 14,
     "optimal": true,
     "obj": null,
@@ -81,6 +81,14 @@
     ]
   },
   "opt-opt_base_SB_implicit_rr-chuffed": {
+    "time": 300,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-opt_base_SB_implicit_luby-chuffed": {
     "time": 300,
     "optimal": false,
     "obj": null,
