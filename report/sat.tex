@@ -1,0 +1,77 @@
+\section{SAT Model}
+
+\subsection{Decision variables}
+
+Given the set of teams $\mathcal{T} = \{1, \dots, n\}$, the set of weeks $\mathcal{W} = \{1, \dots, n-1\}$, and the set of periods $\mathcal{P} = \{1, \dots, n/2\}$, we define the following Boolean decision variables:
+
+\begin{itemize}
+    \item $mp_{i,j,p}$: This variable represents the Boolean channeling of the integer variable $\pi_{ij}$ defined in the Introduction. It is true if and only if the match between team $i$ and team $j$ (where $i < j$) is played in period $p \in \mathcal{P}$ (where the week $w$ in which the match $\{i,j\}$ occurs is deterministically fixed by the \textit{circle method}).
+    
+    \item $h_{i,j}$: true if and only if, in the match between $i$ and $j$ (where $i < j$), team $i$ plays at home.
+\end{itemize}
+
+To implement the \textit{deficient teams} strategy, the following auxiliary variables are introduced:
+
+\begin{itemize}
+    \item $def_{t,p}$: true if and only if team $t \in \mathcal{T}$ is ``deficient'' in period $p \in \mathcal{P}$, meaning it plays exactly one match in that period.
+\end{itemize}
+
+\subsection{Objective function}
+
+Optimization is managed through a binary search procedure on the objective variable $\beta$, which represents the maximum allowable imbalance between home and away games for each team.
+The problem is solved iteratively as a sequence of decision problems by adding cardinality constraints on the sum of the $h_{i,j}$ variables.
+
+For each team $t$, and for a fixed value $\beta$, we enforce:
+$$ \lceil (n-1 - \beta)/2 \rceil \le \sum_{j \neq t} \mathbb{I}(t \mbox{ plays home vs } j) \le \lfloor (n-1 + \beta)/2 \rfloor $$
+
+\subsection{Constraints}
+
+\paragraph{Main problem constraints}
+
+\begin{enumerate}
+    \item \textbf{Unique period assignment:} Each match $\{i,j\}$ fixed by the Circle Method must be assigned to exactly one period $p$.
+    $$ \sum_{p \in P} mp_{i,j,p} = 1 \quad \forall \{i,j\} \in \mbox{Matches} $$
+    Encoded with \textit{exactly-one pairwise} clauses.
+
+    \item \textbf{Slot capacity:} In every week $w$ and period $p$, exactly one match must be played. Let $M_w$ be the set of matches scheduled for week $w$:
+    $$ \sum_{\{i,j\} \in M_w} mp_{i,j,p} = 1 \quad \forall w \in \mathcal{W}, \forall p \in \mathcal{P} $$
+    Encoded with \textit{exactly-one pairwise} clauses.
+
+    \item \textbf{Matches per period limit:} Each team $t$ can play at most 2 matches in the same period $p$.
+    $$ \sum_{j \neq t} mp_{t,j,p} \le 2 \quad \forall t \in \mathcal{T}, \forall p \in \mathcal{P} $$
+     Encoded with \textit{at-most-2 pairwise} clauses.
+\end{enumerate}
+
+\paragraph{Implied constraints (\textit{deficient teams})}
+To improve performance, the logic of \textit{Deficient Teams} is implemented. Since each team plays at most 2 matches in a period, a team is deficient if it plays exactly 1.
+
+\begin{enumerate}
+    \item \textbf{Auxiliary variable definition:}
+    $$ def_{t,p} \iff \left( \sum_{j \neq t} mp_{t,j,p} = 1 \right) $$
+    Logically implemented by enforcing that $def_{t,p}$ implies \textit{at-least-one} and \textit{not-at-least-two} (since \textit{at-least-three} is already excluded by the main constraints).
+
+    \item \textbf{Deficient count per period:} In every period, exactly 2 teams must be deficient.
+    $$ \sum_{t \in T} def_{t,p} = 2 \quad \forall p \in P $$
+    This constraint is encoded using the \textit{Exactly-k Totalizer} encoding.
+
+
+    \item \textbf{Deficient count per team:} Each team must be deficient in at most one period (a relaxation of the ``exactly one'' constraint for efficiency).
+    $$ \sum_{p \in P} def_{t,p} \le 1 \quad \forall t \in T $$
+    Encoded with \textit{at-most-1 pairwise} clauses.
+\end{enumerate}
+
+\paragraph{Symmetry breaking constraints}
+To reduce the search space, two forms of symmetry breaking are introduced:
+
+\begin{enumerate}
+    \item \textbf{Home/Away symmetry:} We fix the home/away pattern for Team 1. Considering Team 1's matches ordered by game week, we enforce that it plays home in the first half of the tournament and away in the second.
+    $$ home_{1,j} = 1 \quad \forall \mbox{ first } \lfloor(n-1)/2\rfloor \mbox{ matches of } t_1 $$
+
+    \item \textbf{Period lexicographic ordering:} Since periods are interchangeable, we enforce a lexicographic ordering on the period assignment vectors.
+    $$ \mbox{Vector}(p) \le_{lex} \mbox{Vector}(p+1) \quad \forall p \in \{1, \dots, |\mathcal{P}|-1\} $$
+    Where $\mbox{Vector}(p)$ is the concatenation of variables $mp_{i,j,p}$ for all matches. This constraint is implemented via a chain of logical implications.
+\end{enumerate}
+
+\subsection{Validation}
+\paragraph{Experimental design}
+The SAT solver utilized is \texttt{Z3} accessed via its Python API.
