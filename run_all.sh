@@ -1,76 +1,53 @@
 #!/bin/bash
 
-# Automated script to run all STS models on all instances
-# As required by the project documentation
+# Run benchmarks based on res/max_n_summary.txt
+# Each line format: (approach, model_name, max_n, optimization, solver_name)
 
-set -e
+set -euo pipefail
 
-# Configuration
-MAX_TEAMS=20
-TIMEOUT=300
-RESULTS_DIR="res"
+SUMMARY_FILE="res/max_n_summary.txt"
 
-echo "======================================"
-echo "STS Solver - Comprehensive Benchmark"
-echo "======================================"
-echo "Max teams: $MAX_TEAMS"
-echo "Timeout: ${TIMEOUT}s per solver"
-echo "Results directory: $RESULTS_DIR"
-echo "======================================"
-
-# Create results directories
-mkdir -p $RESULTS_DIR/{CP,SAT,SMT,MIP}
-
-echo ""
-echo "Running comprehensive benchmark with all solvers..."
-echo "This will test multiple formulations for each approach."
-echo ""
-
-# Run comprehensive benchmark
-if timeout $((TIMEOUT * 100)) uv run sts comprehensive-benchmark $MAX_TEAMS --timeout $TIMEOUT; then
-    echo ""
-    echo "✓ Comprehensive benchmark completed successfully"
-else
-    echo ""
-    echo "✗ Comprehensive benchmark encountered issues"
+if [[ ! -f "$SUMMARY_FILE" ]]; then
+	echo "Summary file not found: $SUMMARY_FILE"
+	echo "Run: uv run ./scripts/max_n_report.py"
+	exit 1
 fi
 
-echo ""
-echo "======================================"
-echo "Benchmark completed!"
-echo "======================================"
+while IFS= read -r line; do
+	# skip empty lines
+	[[ -z "$line" ]] && continue
 
-# Count results
-total_results=0
-for approach in "${APPROACHES[@]}"; do
-    count=$(ls -1 $RESULTS_DIR/$approach/*.json 2>/dev/null | wc -l || echo 0)
-    echo "$approach: $count results"
-    total_results=$((total_results + count))
-done
+	# strip parentheses
+	clean=${line#(}
+	clean=${clean%)}
+	# split by comma into array
+	IFS=',' read -r approach model_name max_n optimization solver_name <<< "$clean"
 
-echo "Total results: $total_results"
+	# trim spaces
+	approach=$(echo "$approach" | xargs)
+	model_name=$(echo "$model_name" | xargs)
+	max_n=$(echo "$max_n" | xargs)
+	optimization=$(echo "$optimization" | xargs)
+	solver_name=$(echo "$solver_name" | xargs)
 
-echo ""
-echo "Running post-benchmark analysis..."
-echo "======================================"
+	# compute target n = max_n + 2
+	if [[ "$max_n" =~ ^[0-9]+$ ]]; then
+		target_n=$((max_n + 2))
+	else
+		echo "Invalid max_n in line: $line"
+		continue
+	fi
 
-# Run comprehensive analysis
-if command -v uv >/dev/null 2>&1; then
-    echo "📊 Generating benchmark analysis report..."
-    uv run sts analyze --format console
-    
-    echo ""
-    echo "📈 Exporting results for further analysis..."
-    uv run sts analyze --format json
-    uv run sts analyze --format csv
-    
-    echo ""
-    echo "✅ Analysis complete!"
-    echo "  - Console report shown above"
-    echo "  - JSON data: res/benchmark_analysis.json"  
-    echo "  - CSV data: res/benchmark_summary.csv"
-else
-    echo "To run analysis manually:"
-    echo "  uv run sts analyze --format console"
-    echo "  uv run sts validate-results"
-fi
+	cmd=(uv run sts benchmark "$target_n" --approach "$approach" --model "$model_name")
+
+	# add flags conditionally
+	if [[ "$optimization" == "True" || "$optimization" == "true" ]]; then
+		cmd+=(--optimization)
+	fi
+	if [[ "$solver_name" != "None" && "$solver_name" != "null" && -n "$solver_name" ]]; then
+		cmd+=(--solver "$solver_name")
+	fi
+
+	echo "Running: ${cmd[*]}"
+	"${cmd[@]}"
+done < "$SUMMARY_FILE"

@@ -1,7 +1,7 @@
 {
   "base-chuffed": {
     "time": 0,
-    "optimal": false,
+    "optimal": true,
     "obj": null,
     "sol": [
       [[1, 8], [6, 5], [2, 4], [2, 6], [3, 7], [5, 7], [3, 4]],
@@ -12,7 +12,7 @@
   },
   "base_SB-chuffed": {
     "time": 0,
-    "optimal": false,
+    "optimal": true,
     "obj": null,
     "sol": [
       [[1, 8], [2, 8], [6, 7], [3, 5], [4, 6], [5, 7], [3, 4]],
@@ -23,7 +23,7 @@
   },
   "base_SB_implicit-chuffed": {
     "time": 0,
-    "optimal": false,
+    "optimal": true,
     "obj": null,
     "sol": [
       [[1, 8], [4, 7], [2, 4], [3, 5], [5, 8], [2, 3], [1, 6]],
@@ -34,7 +34,7 @@
   },
   "base_SB-gecode": {
     "time": 0,
-    "optimal": false,
+    "optimal": true,
     "obj": null,
     "sol": [
       [[1, 8], [5, 6], [2, 4], [1, 7], [4, 6], [2, 3], [7, 8]],
@@ -45,7 +45,7 @@
   },
   "base_SB_implicit-gecode": {
     "time": 0,
-    "optimal": false,
+    "optimal": true,
     "obj": null,
     "sol": [
       [[1, 8], [5, 6], [2, 4], [1, 7], [4, 6], [2, 3], [7, 8]],
@@ -56,7 +56,7 @@
   },
   "base-gecode": {
     "time": 0,
-    "optimal": false,
+    "optimal": true,
     "obj": null,
     "sol": [
       [[4, 5], [1, 3], [6, 7], [3, 5], [1, 2], [6, 8], [7, 8]],
@@ -67,7 +67,7 @@
   },
   "base_SB_implicit_ff-chuffed": {
     "time": 0,
-    "optimal": false,
+    "optimal": true,
     "obj": null,
     "sol": [
       [[1, 8], [2, 8], [6, 7], [3, 5], [1, 2], [5, 7], [3, 4]],
@@ -78,7 +78,7 @@
   },
   "base_SB_implicit_ff-gecode": {
     "time": 0,
-    "optimal": false,
+    "optimal": true,
     "obj": null,
     "sol": [
       [[1, 8], [2, 8], [6, 7], [3, 5], [1, 2], [5, 7], [3, 4]],
@@ -89,7 +89,7 @@
   },
   "base_SB_implicit_ff_luby-chuffed": {
     "time": 0,
-    "optimal": false,
+    "optimal": true,
     "obj": null,
     "sol": [
       [[1, 8], [2, 8], [6, 7], [3, 5], [1, 2], [5, 7], [3, 4]],
@@ -100,7 +100,7 @@
   },
   "base_SB_implicit_ff_geometric-chuffed": {
     "time": 0,
-    "optimal": false,
+    "optimal": true,
     "obj": null,
     "sol": [
       [[1, 8], [2, 8], [6, 7], [3, 5], [1, 2], [5, 7], [3, 4]],
@@ -111,7 +111,7 @@
   },
   "base_SB_implicit_ff_geometric-gecode": {
     "time": 0,
-    "optimal": false,
+    "optimal": true,
     "obj": null,
     "sol": [
       [[1, 8], [2, 8], [6, 7], [3, 5], [1, 2], [5, 7], [3, 4]],
@@ -122,7 +122,7 @@
   },
   "base_SB_implicit_ff_luby-gecode": {
     "time": 0,
-    "optimal": false,
+    "optimal": true,
     "obj": null,
     "sol": [
       [[1, 8], [2, 8], [6, 7], [3, 5], [1, 2], [5, 7], [3, 4]],

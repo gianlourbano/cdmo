@@ -1,83 +1,73 @@
-"""Class-based SMT presolve solver (Z3) using period labeling after prescheduling."""
+"""Class-based SMT presolve solver (Z3) with period constraints.
+"""
 
 import time
 from typing import Any, Dict, List, Tuple
-from z3 import Solver, Then, Int, Bool, PbEq, PbLe
+from z3 import Solver, Then, Int, Bool, If, Sum, PbEq, PbLe, Optimize, is_true
 
 from ..utils.solution_format import STSSolution
 from .base import SMTBaseSolver
 from ..base_solver import SolverMetadata
 
 
-def schedule_iterative_divide_and_conquer(n: int) -> Dict[int, List[Tuple[int, int]]]:
-    if n == 0:
-        return {}
-    teams = list(range(1, n + 1))
-    schedule: Dict[int, List[Tuple[int, int]]] = {}
-    for week in range(1, n):
-        schedule[week] = []
-        opponent_for_n = teams[(week - 1) % (n - 1)]
-        pair = (min(n, opponent_for_n), max(n, opponent_for_n))
-        schedule[week].append(pair)
-        for i in range(1, n // 2):
-            team1_idx = (week - 1 + i) % (n - 1)
-            team2_idx = (week - 1 - i + (n - 1)) % (n - 1)
-            team1 = teams[team1_idx]
-            team2 = teams[team2_idx]
-            pair2 = (min(team1, team2), max(team1, team2))
-            schedule[week].append(pair2)
-    return schedule
-
-
-def home_away_balance(matches_per_week: Dict[int, List[Tuple[int, int]]], n: int):
-    balanced: Dict[int, List[Tuple[int, int]]] = {}
-    for w, matches in matches_per_week.items():
-        row: List[Tuple[int, int]] = []
-        for (i, j) in matches:
-            d = (j - i) % n
-            row.append((i, j) if d < n // 2 else (j, i))
-        balanced[w] = row
-    return balanced
+def circle_matchings(n: int) -> Dict[int, List[Tuple[int, int]]]:
+    pivot, circle = n, list(range(1, n))
+    weeks = n - 1
+    m: Dict[int, List[Tuple[int, int]]] = {}
+    for w in range(weeks):
+        ms: List[Tuple[int, int]] = [(pivot, circle[w])]
+        for k in range(1, n // 2):
+            i = circle[(w + k) % (n - 1)]
+            j = circle[(w - k) % (n - 1)]
+            a, b = (i, j) if i < j else (j, i)
+            ms.append((a, b))
+        m[w] = ms
+    return m
 
 
 class SMTPresolveNativeSolver(SMTBaseSolver):
-    """Presolve variant using heuristic schedule + period labeling (Z3)."""
-
-    def _build_model(self) -> Tuple[Solver, Dict[str, Any]]:
+    def _build_model(self) -> Tuple[Any, Dict[str, Any]]:  # Solver or Optimize
         n = self.n
         periods = n // 2
-        raw = schedule_iterative_divide_and_conquer(n)
-        matches_per_week = home_away_balance(raw, n)
+        matches_per_week = circle_matchings(n)
         weeks = sorted(matches_per_week.keys())
 
-        try:
-            solver = Then('card2bv', 'smt').solver()
-        except Exception:
-            solver = Solver()
-        solver.set(timeout=self.timeout * 1000)
+        # Choose solver kind (Optimize if optimization enabled)
+        if self.optimization:
+            solver = Optimize()
+        else:
+            try:
+                solver = Then('card2bv', 'smt').solver()
+            except Exception:
+                solver = Solver()
+        solver.set("timeout", self.timeout * 1000)
+        if not self.optimization:
+            solver.set("random_seed", 69)
 
-        # Period assignment variables p[w,i,j] in [1..periods]
         p: Dict[Tuple[int, int, int], Any] = {}
+        home: Dict[Tuple[int, int, int], Bool] = {}
         for w in weeks:
             for (i, j) in matches_per_week[w]:
                 p[(w, i, j)] = Int(f"p_{w}_{i}_{j}")
+                if self.optimization:
+                    home[(w, i, j)] = Bool(f"home_{w}_{i}_{j}")  # True => i is home, j away
 
-        for var in p.values():
+        for var in p.values():  # domain bounds for period assignment
             solver.add(var >= 1, var <= periods)
 
-        # Week 1 ordering (symmetry)
+        # Symmetry breaking: fix first week ordering (period indices)
         w1 = weeks[0]
         for k, (i, j) in enumerate(sorted(matches_per_week[w1])):
             solver.add(p[(w1, i, j)] == k + 1)
 
-        # One match per slot per week
+        # Exactly one match in each period per week
         for w in weeks:
             for k in range(1, periods + 1):
                 guards = [(p[(w, i, j)] == k, 1) for (i, j) in matches_per_week[w]]
                 solver.add(PbEq(guards, 1))
 
-        # At most two appearances per team per period
         teams = {t for w in weeks for (i, j) in matches_per_week[w] for t in (i, j)}
+        # At most two appearances for a team in same period across the season
         for t in teams:
             for k in range(1, periods + 1):
                 guards = [(p[(w, i, j)] == k, 1)
@@ -86,24 +76,66 @@ class SMTPresolveNativeSolver(SMTBaseSolver):
                           if t in (i, j)]
                 solver.add(PbLe(guards, 2))
 
+        # Optimization objective (home/away imbalance)
+        total_imbalance_var = None
+        if self.optimization:
+            # Define home/away counts implicitly via Boolean orientation.
+            # home_count[t] = sum over matches where t is designated home
+            # away_count[t] = sum over matches where t is designated away
+            imbalance_vars: Dict[int, Int] = {}
+            total_imbalance_var = Int("total_imbalance")
+
+            for t in teams:
+                home_terms = [If(home[(w, i, j)] if (w, i, j) in home else False,
+                                 1 if i == t else 0,
+                                 1 if j == t else 0)
+                              for w in weeks for (i, j) in matches_per_week[w] if t in (i, j)]
+                away_terms = [If(home[(w, i, j)] if (w, i, j) in home else False,
+                                 1 if j == t else 0,
+                                 1 if i == t else 0)
+                              for w in weeks for (i, j) in matches_per_week[w] if t in (i, j)]
+                home_sum = Sum(home_terms) if home_terms else Int(f"zero_home_{t}")
+                away_sum = Sum(away_terms) if away_terms else Int(f"zero_away_{t}")
+                imb = Int(f"imbalance_{t}")
+                imbalance_vars[t] = imb
+                # imb >= home_sum - away_sum and imb >= away_sum - home_sum
+                solver.add(imb >= home_sum - away_sum)
+                solver.add(imb >= away_sum - home_sum)
+                # Non-negative bounds (implicit above) but keep explicit:
+                solver.add(imb >= 0)
+                solver.add(imb <= periods)  # loose upper bound
+
+            # total_imbalance_var bounds + relation
+            solver.add(total_imbalance_var >= 0)
+            solver.add(total_imbalance_var <= periods)
+            for imb in imbalance_vars.values():
+                solver.add(total_imbalance_var >= imb)
+
+            # Minimize the maximum imbalance
+            if isinstance(solver, Optimize):
+                solver.minimize(total_imbalance_var)
+
         return solver, {
             "p": p,
             "weeks": weeks,
             "periods": periods,
             "matches_per_week": matches_per_week,
+            "home": home if self.optimization else None,
+            "total_imbalance": total_imbalance_var,
         }
 
-    def _solve_model(self, model: Tuple[Solver, Dict[str, Any]]) -> STSSolution:
+    def _solve_model(self, model: Tuple[Any, Dict[str, Any]]) -> STSSolution:  # Solver or Optimize
         solver, state = model
         start = time.time()
-        if solver.check().r == 1:
+        result = solver.check()
+        if result.r == 1:
             m = solver.model()
             weeks: List[int] = state["weeks"]
             periods: int = state["periods"]
             p = state["p"]
             mpw = state["matches_per_week"]
+            home = state.get("home")
 
-            # Build weeks x periods matrix
             sol_weeks: List[List[List[int]]] = []
             for w in weeks:
                 row: List[List[int]] = []
@@ -118,11 +150,17 @@ class SMTPresolveNativeSolver(SMTBaseSolver):
                             except Exception:
                                 assigned = -1
                         if assigned == k:
-                            row.append([a, b])
+                            if home:
+                                hv = m.eval(home[(w, a, b)])
+                                if is_true(hv):
+                                    row.append([a, b])  # a home
+                                else:
+                                    row.append([b, a])  # b home
+                            else:
+                                row.append([a, b])
                             break
                 sol_weeks.append(row)
 
-            # Transpose to periods x weeks
             sol_periods: List[List[List[int]]] = []
             for k in range(periods):
                 col: List[List[int]] = []
@@ -132,14 +170,16 @@ class SMTPresolveNativeSolver(SMTBaseSolver):
 
             obj = None
             if self.optimization:
-                home_counts = [0] * (self.n + 1)
-                away_counts = [0] * (self.n + 1)
-                for period_games in sol_periods:
-                    for home, away in period_games:
-                        if home and away:
-                            home_counts[home] += 1
-                            away_counts[away] += 1
-                obj = sum(abs(home_counts[t] - away_counts[t]) for t in range(1, self.n + 1))
+                total_imbalance_var = state.get("total_imbalance")
+                if total_imbalance_var is not None:
+                    try:
+                        obj_val = m.eval(total_imbalance_var).as_long()
+                    except Exception:
+                        try:
+                            obj_val = int(str(m.eval(total_imbalance_var)))
+                        except Exception:
+                            obj_val = None
+                    obj = obj_val
 
             return STSSolution(time=int(time.time() - start), optimal=True, obj=obj, sol=sol_periods)
 
@@ -152,5 +192,5 @@ class SMTPresolveNativeSolver(SMTBaseSolver):
             approach="SMT",
             version="1.0",
             supports_optimization=True,
-            description="SMT presolve with period labeling (Z3)",
+            description="SMT presolve with additional period constraints (Z3); supports imbalance minimization",
         )

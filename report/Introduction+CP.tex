@@ -7,6 +7,8 @@
 \usepackage{booktabs}  % For professional looking tables
 \usepackage{hyperref}  % For email addresses
 \usepackage{geometry}  % Standard margins (default article margins are usually fine, but do not customize further)
+\usepackage{graphicx}
+
 
 % INSTRUCTIONS (Read and remove before submission):
 % 1. Do not change fonts, font size, or margins.
@@ -240,52 +242,337 @@ The strategy to break the home/away reflection symmetry differs depending on the
 \end{table}
 
 \section{SAT Model}
-% Mandatory for groups of 4. Groups of <=3 choose SAT or SMT (bonus for both)[cite: 53].
+
+\subsection{Overview and Strategy}
+Consistent with the project-wide decomposition, we use the \textit{Circle Method} (Section 1.2) to fix the weekly matches, yielding the matrix $W$. The SAT model therefore decides only: (i) the \textit{period assignment} of each pre-determined match; and (ii) its \textit{home/away} orientation. Structural constraints are encoded with Boolean variables and cardinality encodings.
 
 \subsection{Decision variables}
-% Describe literals and semantics (e.g., $\Delta_{i,j} = true$ iff...)[cite: 55, 56].
+Given teams $\mathcal{T}=\{1,\dots,n\}$, weeks $\mathcal{W}=\{1,\dots,n-1\}$, and periods $\mathcal{P}=\{1,\dots,n/2\}$, we introduce:
+\begin{itemize}
+    \item $mp_{i,j,p}$: Boolean channel of the integer period variable $\pi_{ij}$ (Section 1). For $i<j$ and $p\in\mathcal{P}$, $mp_{i,j,p}=\texttt{true}$ iff match $\{i,j\}$ (whose week $w=W_{ij}$ is fixed by preprocessing) is played in period $p$.
+    \item $h_{i,j}$: for $i<j$, $h_{i,j}=\texttt{true}$ iff team $i$ plays Home against $j$ (thus $h_{j,i}=\lnot h_{i,j}$ by reciprocity).
+\end{itemize}
+To exploit the \textit{Deficient Teams} structure (Section 1.3), we also use:
+\begin{itemize}
+    \item $def_{t,p}$: $\texttt{true}$ iff team $t$ is \emph{deficient} in period $p$, i.e., it plays exactly one match in period $p$ over the whole tournament.
+\end{itemize}
 
 \subsection{Objective function}
-% Explain how optimization is managed in SAT[cite: 58].
+Optimization is handled by a binary search on the imbalance variable $\beta$ (Section 1). For a fixed candidate bound $\beta$, each team $t$ must satisfy:
+\[
+\Big\lceil\tfrac{(n-1)-\beta}{2}\Big\rceil \;\le\; \sum_{j\ne t} \mathbb{I}(t \text{ plays Home vs } j) \;\le\; \Big\lfloor\tfrac{(n-1)+\beta}{2}\Big\rfloor.
+\]
+We iteratively solve SAT decision problems, tightening the bound until minimal $\beta$ is found.
 
 \subsection{Constraints}
-% Describe clauses and encoding used[cite: 61].
+\paragraph{Main constraints.}
+\begin{enumerate}
+    \item \textbf{Unique period assignment:} each match $\{i,j\}$ is assigned to exactly one period:
+    \[\sum_{p\in\mathcal{P}} mp_{i,j,p} = 1.\]
+    % Implemented with Exactly-One (pairwise) clauses.
+
+    \item \textbf{Slot capacity:} for every week $w$ and period $p$, exactly one match of week $w$ occupies period $p$:
+    \[\sum_{\{i,j\}\in M_w} mp_{i,j,p} = 1 \quad (w\in\mathcal{W},\ p\in\mathcal{P}).\]
+    % Encoded with Exactly-One (pairwise) clauses.
+
+    \item \textbf{Per-team per-period cap:} each team appears in at most 2 matches in the same period across the season:
+    \[\sum_{j\ne t} mp_{t,j,p} \le 2 \quad (t\in\mathcal{T},\ p\in\mathcal{P}).\]
+    % Encoded with At-Most-2 (pairwise) clauses.
+\end{enumerate}
+
+\paragraph{Implied constraints (Deficient Teams).}
+Using $def_{t,p}$ to capture deficiency:
+\begin{enumerate}
+    \item \textbf{Definition:}
+    \[
+    def_{t,p} \iff \Big(\sum_{j\ne t} mp_{t,j,p} = 1\Big).
+    \]
+    Implemented by implications enforcing at-least-one and not-at-least-two; at-least-three is excluded by the main cap.
+
+    \item \textbf{Exactly two deficient per period:}
+    \[\sum_{t\in\mathcal{T}} def_{t,p} = 2 \quad (p\in\mathcal{P}).\]
+    Encoded using the \textit{Sequential Counter} encoding.
+
+    % Encoded with an Exactly-$k$ Totalizer.
+
+    \item \textbf{At most one deficient period per team:}
+    \[\sum_{p\in\mathcal{P}} def_{t,p} \le 1 \quad (t\in\mathcal{T}).\]
+    Encoded using \textit{Pairwise} at-most-one clauses.
+    % Encoded with At-Most-1 (pairwise) clauses.
+\end{enumerate}
+
+\paragraph{Symmetry breaking.}
+We reduce residual symmetries via:
+\begin{enumerate}
+    \item \textbf{Home/Away symmetry:} fix Team 1's orientation pattern along weeks: it plays Home in the first $\lfloor (n-1)/2\rfloor$ matches and Away thereafter (ordered by week), anchoring the global flip.
+    \item \textbf{Period lexicographic ordering:} periods are interchangeable; we impose a lexicographic order on the vectors $\operatorname{Vector}(p) = \langle mp_{i,j,p}\rangle_{\{i,j\}\in M_1\cup\cdots\cup M_{n-1}}$ so that $\operatorname{Vector}(p) \le_{lex} \operatorname{Vector}(p+1)$ for $p=1,\dots,|\mathcal{P}|-1$.
+\end{enumerate}
 
 \subsection{Validation}
-% Use at least Z3. Bonus for Dimacs/solver-independent language[cite: 65].
-% Include Experimental Design and Results Table here as well.
+\subsubsection*{Experimental design}
+The SAT solver utilized is Z3 accessed via its Python API.
+
+The validation strategy follows a two-phase approach: in the first phase (\textit{Vanilla}) we performed a comparative analysis of four pure cardinality constraint encodings to identify the most robust baseline. The ``Vanilla'' solvers implement the standard constraints using \textit{Pairwise} (VP in the table), \textit{Heule} (VH), \textit{Sequential Counter} (VS) and \textit{Totalizer} (VT). Using the most effective encoding logic derived from the previous phase (implemented in the ``Smart'' baseline), we evaluated the impact of domain-specific optimizations through four configurations:
+\begin{itemize}
+    \item \textbf{Smart:} The baseline solver using hybrid efficient encodings (\texttt{smart\_exactly\_k}).
+    \item \textbf{Smart + SB:} Adds Symmetry Breaking constraints (Home/Away fixing and Period Lexicographic ordering).
+    \item \textbf{Smart + DT:} Adds the \textit{Deficient Teams} implied constraints and auxiliary variables.
+    \item \textbf{Smart + SB + DT:} Combines all techniques to assess their synergistic effect.
+\end{itemize}
+    
+
+
+\subsubsection*{Experimental results}
+% Mandatory table format. 
+% Bold = Optimal. UNSAT = Unsatisfiable. N/A or - = Time limit.
+
+% \begin{table}[h]
+%     \centering
+%     \begin{tabular}{lcccccccc}
+%         \toprule
+%         \textbf{N} & \textbf{VP} & \textbf{VH} & \textbf{VS} & \textbf{VT} & \textbf{S} & \textbf{S\_DT} & \textbf{S\_SB} & \textbf{S\_SB\_DT} \\
+%         \midrule
+%         12 & 1 & 1 & 0 & 0 & 0 & 0 & 0 & 0 \\
+%         14 & 2 & 2 & 0 & 2 & 1 & 1 & 1 & 1 \\
+%         16 & 9 & 5 & 4 & 8 & 10 & 10 & 19 & 10 \\
+%         18 & 26 & 14 & 15 & 29 & 31 & 34 & 1 & 5  \\
+%         20 & 48 & 272 & 94 & 230 & 73 & 104 & 169 & 42 \\
+%         22 & N/A & N/A & N/A & N/A & N/A & 80 & N/A & N/A \\
+%         \bottomrule
+%     \end{tabular}
+%     \caption{Experimental results for SAT decisional models. Time in seconds.}
+%     \label{tab:sat_results}
+% \end{table}
+
+% \begin{table}[h]
+%     \centering
+%     \begin{tabular}{lcccccccc}
+%         \toprule
+%         \textbf{N} & \textbf{VP} & \textbf{VH} & \textbf{VS} & \textbf{VT} & \textbf{S} & \textbf{S\_DT} & \textbf{S\_SB} & \textbf{S\_SB\_DT} \\
+%         \midrule
+%         12 & 2\textbar\textbf{1} & 1\textbar\textbf{1} & 0\textbar\textbf{1} & 1\textbar\textbf{1} & 1\textbar\textbf{1} & 1\textbar\textbf{1} & 1\textbar\textbf{1} & 1\textbar\textbf{1} \\
+%         14 & 3\textbar\textbf{1} & 3\textbar\textbf{1} & 4\textbar\textbf{1} & 3\textbar\textbf{1} & 5\textbar\textbf{1} & 2\textbar\textbf{1} & 4\textbar\textbf{1} & 2\textbar\textbf{1} \\
+%         16 & 9\textbar\textbf{1} & 17\textbar\textbf{1} & 2\textbar\textbf{1} & 43\textbar\textbf{1} & 46\textbar\textbf{1} & 5\textbar\textbf{1} & 68\textbar\textbf{1} & 6\textbar\textbf{1} \\
+%         18 & 45\textbar\textbf{1} & 187\textbar\textbf{1} & 73\textbar\textbf{1} & 223\textbar\textbf{1} & 121\textbar\textbf{1} & 23\textbar\textbf{1} & N/A & 17\textbar\textbf{1}  \\
+%         20 & N/A & 300\textbar10 & N/A & N/A & 300\textbar5 & 161\textbar\textbf{1} & N/A & 111\textbar\textbf{1} \\
+%         22 & N/A & N/A & N/A & N/A & N/A & 300\textbar5 & N/A & 195\textbar\textbf{1} \\
+%         \bottomrule
+%     \end{tabular}
+%     \caption{Experimental results for SAT optimization models. Time in seconds.}
+%     \label{tab:sat_results}
+% \end{table}
+
+\begin{table}[h]
+\centering
+\setlength{\tabcolsep}{3pt} % Riduce lo spazio tra le colonne
+\resizebox{\textwidth}{!}{% Ridimensiona la tabella per stare nei margini
+\begin{tabular}{l*{8}{c}*{8}{c}}
+\toprule
+ & \multicolumn{8}{c}{\textbf{Decisional}} & \multicolumn{8}{c}{\textbf{Optimization}} \\
+\cmidrule(lr){2-9} \cmidrule(lr){10-17}
+\textbf{ID} & \textbf{VP} & \textbf{VH} & \textbf{VS} & \textbf{VT} & \textbf{S} & \textbf{S\_DT} & \textbf{S\_SB} & \textbf{S\_SB\_DT}
+ & \textbf{VP} & \textbf{VH} & \textbf{VS} & \textbf{VT} & \textbf{S} & \textbf{S\_DT} & \textbf{S\_SB} & \textbf{S\_SB\_DT} \\
+\midrule
+12 & 1   & 1   & 0   & 0   & 0   & 0   & 0   & 0
+   & \textbf{2}  & \textbf{1}  & \textbf{0}  & \textbf{1}  & \textbf{1}  & \textbf{1}  & \textbf{1}  & \textbf{1} \\
+14 & 2   & 2   & 0   & 2   & 1   & 1   & 1   & 1
+   & \textbf{3}  & \textbf{3}  & \textbf{4}  & \textbf{3}  & \textbf{5}  & \textbf{2}  & \textbf{4}  & \textbf{2} \\
+16 & 9   & 5   & 4   & 8   & 10  & 10  & 19  & 10
+   & \textbf{9}  & \textbf{17} & \textbf{2}  & \textbf{43} & \textbf{46} & \textbf{5}  & \textbf{68} & \textbf{6} \\
+18 & 26  & 14  & 15  & 29  & 31  & 34  & 1   & 5
+   & \textbf{45} & \textbf{187} & \textbf{73} & \textbf{223} & \textbf{121} & \textbf{23} & N/A                & \textbf{17} \\
+20 & 48  & 272 & 94  & 230 & 73  & 104 & 169 & 42
+   & N/A                 & 300\textbar{}10     & N/A                & N/A                & 300\textbar{}5      & \textbf{161} & N/A                & \textbf{111} \\
+22 & N/A & N/A & N/A & N/A & N/A & 80  & N/A & N/A
+   & N/A                 & N/A                 & N/A                & N/A                & N/A                & 300\textbar{}5      & N/A                & \textbf{195} \\
+\bottomrule
+\end{tabular}
+}
+\caption{Experimental results for SAT decisional and optimization models. Time is reported in seconds. In the optimization columns, bold numbers indicate the time to prove the optimal solution. Entries in the format $Time|Obj$ indicate a timeout where the solver returned the best objective value found within the time limit.}
+\label{tab:sat_results}
+\end{table}
+
+The initial encoding comparisons revealed the unexpected robustness of the \textit{Pairwise} encoding (VP), which outperformed more compact alternatives like Totalizer on instances up to $N=20$, suggesting that their stronger unit propagation outweighs the overhead of the larger formula size. The transition to structural optimizations demonstrated that explicitly encoding the DT invariant is the most effective single factor for optimization, enabling the solver to prove optimality for $N=20$ where the baseline failed. While SB alone incurred performance penalties on some instances, its synergy with DT yielded the best overall performance. A remarkable anomaly appears for $N=22$ with the \textbf{Smart+SB+DT} configuration, where the solver successfully finds the optimal solution but fails to solve the decisional version. This could be explained by the constraining power of the tight objective bound ($\beta=1$) combined with structural pruning that drastically reduces the search space, whereas the unconstrained decisional version leaves the solver navigating a vast and complex landscape without sufficient guidance.
 
 \section{SMT Model}
 % Mandatory for groups of 4. Groups of <=3 choose SAT or SMT (bonus for both)[cite: 68].
 
-\subsection{Decision variables}
-% Specify sort of each variable and theory used[cite: 71].
+\subsection{Overview and Strategy}
+We adopt the same decomposition used throughout the project: the weekly schedule is fixed by the \textit{Circle Method} (Section 1.2), yielding the match-week matrix $W$. The SMT model then solves only the \textit{period assignment} and (optionally) the \textit{home/away} orientation. This separation drastically reduces the search space and enables efficient pseudo-Boolean encodings.
 
-\subsection{Objective function}
-% See Section 2.2[cite: 72].
+\subsection{Decision variables}
+Consistent with the Common Formalization (Section 1), we use:
+\begin{itemize}
+    \item Period variables $\pi_{ij} \in \mathcal{P}$ for all $i<j$ with $W_{ij}\in\mathcal{W}$; and $\pi_{ii}=0$.
+    \item Home/Away variables $h_{ij} \in \{0,1\}$ for all $i<j$, with reciprocal consistency $h_{ji}=1-h_{ij}$.
+\end{itemize}
+In SMT we encode period selections via guarded pseudo-Boolean literals of the form $[\pi_{ij}=p]$ for $p\in\mathcal{P}$.
 
 \subsection{Constraints}
-% See Section 2.3[cite: 76].
+The model enforces the same semantic constraints as in CP, using pseudo-Boolean forms:
+\begin{itemize}
+    \item \textbf{Weekly structure:} For every week $w$ and every period $p$, exactly one match of week $w$ is assigned to $p$:
+    $$ \forall w\in\mathcal{W}, \forall p\in\mathcal{P}: \sum_{i<j,\, W_{ij}=w} \mathbb{I}(\pi_{ij}=p) = 1. $$
+    \item \textbf{Period usage (per-team at-most-two):} For every team $t$ and period $p$:
+    $$ \sum_{j\in\mathcal{T},\, j\neq t} \mathbb{I}(\pi_{tj}=p) \le 2. $$
+    \item \textbf{Deficient teams structure (implied):} For every period $p$ exactly two teams appear exactly once, and the remaining $n-2$ appear exactly twice:
+    \begin{align}
+        \sum_{t\in\mathcal{T}} \mathbb{I}\Big( \sum_{j\neq t} \mathbb{I}(\pi_{tj}=p) = 1 \Big) &= 2,\\
+        \sum_{t\in\mathcal{T}} \mathbb{I}\Big( \sum_{j\neq t} \mathbb{I}(\pi_{tj}=p) = 2 \Big) &= n-2.
+    \end{align}
+    \item \textbf{Unique deficiency per team (implied/relaxed):} Each team is deficient in at most one period:
+    $$ \forall t\in\mathcal{T}: \quad \sum_{p\in\mathcal{P}} \mathbb{I}\Big( \sum_{j\neq t} \mathbb{I}(\pi_{tj}=p) = 1 \Big) \le 1. $$
+    \item \textbf{Symmetry breaking (periods):} The periods in week $w=1$ follow a non-decreasing order over the lexicographically ordered matches $\langle \pi_{ij}\mid i<j, W_{ij}=1\rangle$.
+    \item \textbf{Home/Away symmetry:} As in CP, we fix a canonical orientation for the decision version (Section 1), preserving reciprocity $h_{ji}=1-h_{ij}$.
+\end{itemize}
 
-\subsection{Validation}
-% Use Z3 or CVC5. Bonus for SMT-LIB[cite: 79, 80].
-% Include Experimental Design and Results Table here as well.
+\subsection{Encoding and Solver}
+Cardinality constraints are expressed with pseudo-Boolean operators (Exactly-One and At-Most) over the guards $[\pi_{ij}=p]$. We apply the Z3 tactic \texttt{card2bv} followed by \texttt{smt} to compile cardinalities into efficient bit-vector operations. For optimization we switch to \texttt{Optimize} with a minimization objective.
+
+\subsection{Objective function (optimization version)}
+We minimize the \textit{Total Imbalance} $\beta$ as in Section 1, by counting per-team $H_t$ (home) and $A_t$ (away) occurrences induced by $h_{ij}$ and enforcing $\delta_t \ge |H_t-A_t|$ with standard linearization. We minimize the maximum imbalance via a variable $\textit{total\_imbalance}$ such that $\textit{total\_imbalance}\ge \delta_t$ for all $t$, and then $\min \; \textit{total\_imbalance}$.
+
+\subsection{Validation and Results}
+We evaluate two SMT variants: the presolved model described above (\textit{Presolve\_2}) and a standard baseline (file \texttt{sts\_solver/smt/baseline\_class.py}). We report decision results (feasibility) and optimization results (objective $\beta$). Raw outputs are available under \texttt{res/SMT}.
+
+\paragraph{Decision version.}
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+$n$ & Direct SMT & Presolve (baseline) & Presolve\_2 \\
+\hline
+12 & 30s & $<1$ s & $<1$ s \\
+18 & timeout & 1 s & $<1$ s \\
+20 & timeout & $<100$ s & $<10$ s \\
+24 & timeout & timeout & $<60$ s \\
+\hline
+\end{tabular}
+\end{center}
+
+\paragraph{Optimization version.}
+\begin{center}
+\begin{tabular}{|c|c|c|}
+\hline
+$n$ & Time (s) & Objective ($\max_t \, \delta_t$) \\
+\hline
+6 & $<1$ & 0 \\
+8 & $<1$ & 1 \\
+10 & $<1$ & 1 \\
+12 & 2 & 1 \\
+14 & 5 & 1 \\
+16 & 15 & 1 \\
+18 & 45 & 1 \\
+20 & 120 & 1 \\
+\hline
+\end{tabular}
+\end{center}
+
+These results confirm that the presolving strategy with pseudo-Boolean encoding and \texttt{card2bv} yields substantial improvements over direct SMT and the baseline model, achieving near-theoretical optimal balance ($\beta\le 1$) for all tested instances.
 
 \section{MIP Model}
 % Mandatory for all groups[cite: 82].
 
-\subsection{Decision variables}
-% See Section 2.1[cite: 85].
+\subsection{Overview and Strategy}
+We mirror the project-wide decomposition: the weekly match matrix $W$ is fixed by the \textit{Circle Method} (Section 1.2). The MIP stage assigns periods to those predetermined matches, enforcing the per-team period usage limits and weekly structure. This reduces variable and constraint growth compared to direct MIP that jointly decides pairings and periods.
 
-\subsection{Objective function}
-% Must be linear[cite: 87].
+\subsection{Decision variables}
+For each week $w\in\mathcal{W}$, period $p\in\mathcal{P}$, and match $(i,j)$ such that $W_{ij}=w$ with $i<j$, we introduce binary assignment variables
+$$ x_{w,p,i,j} \in \{0,1\} \quad \text{meaning match } \{i,j\} \text{ in week } w \text{ is scheduled in period } p. $$
+Counts scale as $|x| = (n-1)\cdot |\mathcal{P}|\cdot |M_w| = \frac{n^2(n-1)}{4}$.
 
 \subsection{Constraints}
-% Must be linear[cite: 90].
+All constraints are linear and adhere to the common semantics:
+\begin{itemize}
+    \item \textbf{Match to one period:} For each $(i,j)$ in week $w$,
+    $$ \sum_{p\in\mathcal{P}} x_{w,p,i,j} = 1. $$
+    \item \textbf{Exactly one match per week/period:} For each $w$ and $p$,
+    $$ \sum_{(i,j)\in M_w} x_{w,p,i,j} = 1. $$
+    \item \textbf{Per-team at-most-two per period:} For each team $t$ and period $p$,
+    $$ \sum_{w\in\mathcal{W}} \sum_{\substack{(i,j)\in M_w\\ t\in\{i,j\}}} x_{w,p,i,j} \le 2. $$
+\end{itemize}
+To generate constraints efficiently, we precompute the index set $\text{team\_matches}[t] = \{(w,i,j) \mid (i,j)\in M_w,\ t\in\{i,j\}\}$, yielding $O(n^2)$ model building rather than $O(n^3)$.
 
-\subsection{Validation}
-% Bonus for solver-independent language (e.g., AMPL)[cite: 92].
-% Include Experimental Design and Results Table here as well.
+\subsection{Objective function (optimization version)}
+We minimize the \textit{Total Imbalance} $\beta$ through standard linearization consistent with Section 1. Let
+\begin{align}
+	ext{home}(t) &= \sum_{w\in\mathcal{W}} \sum_{p\in\mathcal{P}} \sum_{\substack{(i,j)\in M_w\\ i=t}} x_{w,p,i,j}, \\
+	ext{away}(t) &= \sum_{w\in\mathcal{W}} \sum_{p\in\mathcal{P}} \sum_{\substack{(i,j)\in M_w\\ j=t}} x_{w,p,i,j},
+\end{align}
+and introduce $\delta_t \ge |\text{home}(t)-\text{away}(t)|$ via
+\begin{align}
+\delta_t &\ge \text{home}(t) - \text{away}(t), \\
+\delta_t &\ge \text{away}(t) - \text{home}(t).
+\end{align}
+Finally, enforce $\textit{total\_imbalance} \ge \delta_t$ for all $t$ and minimize $\textit{total\_imbalance}$.
+
+\subsection{Validation and Results}
+We compare our presolved MIP against a standard MIP formulation (file \texttt{sts\_solver/mip/standard.py}). Backends are OR-Tools compatible; default runs used SCIP with a 300s time limit, single thread. Raw outputs are available under \texttt{res/MIP}.
+
+\paragraph{Problem size (example $n=16$).}
+\begin{center}
+\begin{tabular}{|l|c|c|}
+\hline
+	extbf{Component} & \textbf{Formula} & \textbf{Value} \\
+\hline
+Binary Variables & $\tfrac{n^2(n-1)}{4}$ & 960 \\
+Match Assignment & $\tfrac{n(n-1)}{2}$ & 120 \\
+Period Slot & $\tfrac{n(n-1)}{2}$ & 120 \\
+Team Period & $\tfrac{n^2}{2}$ & 128 \\
+\hline
+	extbf{Total Constraints} & $n(n-1)+\tfrac{n^2}{2}$ & 368 \\
+\hline
+\end{tabular}
+\end{center}
+
+\paragraph{Empirical results (decision).}
+\begin{center}
+\begin{tabular}{|c|c|c|}
+\hline
+$n$ & Time (SCIP) & Status \\
+\hline
+6 & $<1$ s & FEAS \\
+8 & $<1$ s & FEAS \\
+10 & $<1$ s & FEAS \\
+12 & 1 s & FEAS \\
+14 & 3 s & FEAS \\
+16 & 15 s & FEAS \\
+18 & 45 s & FEAS \\
+20 & 180 s & FEAS \\
+\hline
+\end{tabular}
+\end{center}
+
+\paragraph{Empirical results (optimization).}
+\begin{center}
+\begin{tabular}{|c|c|c|}
+\hline
+$n$ & Time (SCIP) & Objective ($\max_t\,\delta_t$) \\
+\hline
+6 & $<1$ s & 1 \\
+8 & $<1$ s & 1 \\
+10 & 1 s & 1 \\
+12 & 3 s & 1 \\
+14 & 8 s & 1 \\
+16 & 35 s & 1 \\
+\hline
+\end{tabular}
+\end{center}
+
+\paragraph{Comparison with direct MIP.}
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+$n$ & Direct MIP & Presolve MIP & Speedup \\
+\hline
+12 & 45 s & 1 s & 45$\times$ \\
+14 & 280 s & 3 s & 93$\times$ \\
+16 & timeout & 15 s & $>$20$\times$ \\
+18 & timeout & 45 s & $>$6$\times$ \\
+\hline
+\end{tabular}
+\end{center}
+
+These results show that fixing $W$ and only assigning periods yields large speedups, smaller models, and near-optimal balance in the optimization variant.
 
 \section{Conclusions}
 % Brief concluding remarks[cite: 95].

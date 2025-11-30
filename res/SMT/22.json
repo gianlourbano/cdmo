@@ -24,5 +24,21 @@
     "sol": [
 
     ]
+  },
+  "presolve": {
+    "time": 300,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-presolve": {
+    "time": 300,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
   }
 }
