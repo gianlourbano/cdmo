@@ -87,5 +87,13 @@
     "sol": [
 
     ]
+  },
+  "opt-opt_base_SB_implicit_luby-chuffed": {
+    "time": 300,
+    "optimal": false,
+    "obj": null,
+    "sol": [
+
+    ]
   }
 }
