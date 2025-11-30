@@ -1,15 +1,15 @@
 {
   "opt-presolve_2": {
-    "time": 300,
-    "optimal": false,
+    "time": 0,
+    "optimal": true,
     "obj": null,
     "sol": [
 
     ]
   },
   "presolve_2": {
-    "time": 300,
-    "optimal": false,
+    "time": 0,
+    "optimal": true,
     "obj": null,
     "sol": [
 
@@ -17,7 +17,31 @@
   },
   "baseline": {
     "time": 0,
-    "optimal": false,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "compact": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "presolve": {
+    "time": 0,
+    "optimal": true,
+    "obj": null,
+    "sol": [
+
+    ]
+  },
+  "opt-presolve": {
+    "time": 0,
+    "optimal": true,
     "obj": null,
     "sol": [
 

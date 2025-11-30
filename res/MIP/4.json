@@ -1,7 +1,7 @@
 {
   "presolve": {
     "time": 0,
-    "optimal": false,
+    "optimal": true,
     "obj": null,
     "sol": [
 
@@ -9,15 +9,15 @@
   },
   "standard": {
     "time": 0,
-    "optimal": false,
+    "optimal": true,
     "obj": null,
     "sol": [
 
     ]
   },
   "opt-standard": {
-    "time": 1,
-    "optimal": false,
+    "time": 0,
+    "optimal": true,
     "obj": null,
     "sol": [
 
@@ -25,7 +25,7 @@
   },
   "opt-presolve": {
     "time": 0,
-    "optimal": false,
+    "optimal": true,
     "obj": null,
     "sol": [
 

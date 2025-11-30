@@ -19,14 +19,14 @@ class SMTBaselineSolver(SMTBaselineNativeSolver):
 #     pass
 
 
-# @registry.register("SMT", "compact")
-# class SMTCompactSolver(SMTCompactNativeSolver):
-#     pass
+@registry.register("SMT", "compact")
+class SMTCompactSolver(SMTCompactNativeSolver):
+    pass
 
 
-# @registry.register("SMT", "presolve")
-# class SMTPresolveSolver(SMTPresolveNativeSolver):
-#     pass
+@registry.register("SMT", "presolve")
+class SMTPresolveSolver(SMTPresolveNativeSolver):
+    pass
 
 
 @registry.register("SMT", "presolve_2")

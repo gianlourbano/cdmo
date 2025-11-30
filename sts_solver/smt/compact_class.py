@@ -122,6 +122,14 @@ class SMTCompactNativeSolver(SMTBaseSolver):
                     hv = m.eval(match_t1_home[key])
                     home, away = (t1, t2) if is_true(hv) else (t2, t1)
                     schedule[wv][pv] = [home, away]
+            # Transpose to periods-major layout to match presolve_2 (sol[period][week])
+            sol_periods = []
+            for p in range(periods):
+                col = []
+                for w in range(weeks):
+                    col.append(schedule[w][p])
+                sol_periods.append(col)
+
             obj = None
             if self.optimization:
                 home_counts = [0] * (self.n + 1)
@@ -132,7 +140,7 @@ class SMTCompactNativeSolver(SMTBaseSolver):
                             home_counts[home] += 1
                             away_counts[away] += 1
                 obj = sum(abs(home_counts[t] - away_counts[t]) for t in range(1, self.n + 1))
-            return STSSolution(time=elapsed, optimal=True, obj=obj, sol=schedule)
+            return STSSolution(time=elapsed, optimal=True, obj=obj, sol=sol_periods)
         return STSSolution(time=min(elapsed, self.timeout), optimal=False, obj=None, sol=[])
 
     @classmethod
