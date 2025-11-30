@@ -269,15 +269,15 @@ We iteratively solve SAT decision problems, tightening the bound until minimal $
 \begin{enumerate}
     \item \textbf{Unique period assignment:} each match $\{i,j\}$ is assigned to exactly one period:
     \[\sum_{p\in\mathcal{P}} mp_{i,j,p} = 1.\]
-    Implemented with Exactly-One (pairwise) clauses.
+    % Implemented with Exactly-One (pairwise) clauses.
 
     \item \textbf{Slot capacity:} for every week $w$ and period $p$, exactly one match of week $w$ occupies period $p$:
     \[\sum_{\{i,j\}\in M_w} mp_{i,j,p} = 1 \quad (w\in\mathcal{W},\ p\in\mathcal{P}).\]
-    Encoded with Exactly-One (pairwise) clauses.
+    % Encoded with Exactly-One (pairwise) clauses.
 
     \item \textbf{Per-team per-period cap:} each team appears in at most 2 matches in the same period across the season:
     \[\sum_{j\ne t} mp_{t,j,p} \le 2 \quad (t\in\mathcal{T},\ p\in\mathcal{P}).\]
-    Encoded with At-Most-2 (pairwise) clauses.
+    % Encoded with At-Most-2 (pairwise) clauses.
 \end{enumerate}
 
 \paragraph{Implied constraints (Deficient Teams).}
@@ -291,11 +291,14 @@ Using $def_{t,p}$ to capture deficiency:
 
     \item \textbf{Exactly two deficient per period:}
     \[\sum_{t\in\mathcal{T}} def_{t,p} = 2 \quad (p\in\mathcal{P}).\]
-    Encoded with an Exactly-$k$ Totalizer.
+    Encoded using the \textit{Sequential Counter} encoding.
+
+    % Encoded with an Exactly-$k$ Totalizer.
 
     \item \textbf{At most one deficient period per team:}
     \[\sum_{p\in\mathcal{P}} def_{t,p} \le 1 \quad (t\in\mathcal{T}).\]
-    Encoded with At-Most-1 (pairwise) clauses.
+    Encoded using \textit{Pairwise} at-most-one clauses.
+    % Encoded with At-Most-1 (pairwise) clauses.
 \end{enumerate}
 
 \paragraph{Symmetry breaking.}
@@ -309,25 +312,15 @@ We reduce residual symmetries via:
 \subsubsection*{Experimental design}
 The SAT solver utilized is Z3 accessed via its Python API.
 
-The validation strategy follows a two-phase approach:
+The validation strategy follows a two-phase approach: in the first phase (\textit{Vanilla}) we performed a comparative analysis of four pure cardinality constraint encodings to identify the most robust baseline. The ``Vanilla'' solvers implement the standard constraints using \textit{Pairwise} (VP in the table), \textit{Heule} (VH), \textit{Sequential Counter} (VS) and \textit{Totalizer} (VT). Using the most effective encoding logic derived from the previous phase (implemented in the ``Smart'' baseline), we evaluated the impact of domain-specific optimizations through four configurations:
+\begin{itemize}
+    \item \textbf{Smart:} The baseline solver using hybrid efficient encodings (\texttt{smart\_exactly\_k}).
+    \item \textbf{Smart + SB:} Adds Symmetry Breaking constraints (Home/Away fixing and Period Lexicographic ordering).
+    \item \textbf{Smart + DT:} Adds the \textit{Deficient Teams} implied constraints and auxiliary variables.
+    \item \textbf{Smart + SB + DT:} Combines all techniques to assess their synergistic effect.
+\end{itemize}
+    
 
-\begin{enumerate}
-    \item \textbf{Phase 1: encoding selection (Vanilla).} We first performed a comparative analysis of four pure cardinality constraint encodings to identify the most robust baseline. The ``Vanilla'' solvers implement the standard constraints using \textit{Sequential Counter}, \textit{Totalizer}, \textit{Heule} and \textit{Pairwise}.
-    % \begin{itemize}
-    %     \item \textit{Sequential Counter}: Uses auxiliary variables to count literals ($O(n)$ clauses).
-    %     \item \textit{Totalizer}: Uses a divide-and-conquer tree structure ($O(n \log n)$ clauses).
-    %     \item \textit{Heule}: An efficient encoding optimized for ``exactly-one'' constraints.
-    %     \item \textit{Pairwise}: Naive encoding with quadratic/cubic complexity but strong unit propagation ($O(n^2)$ or $O(n^3)$ clauses).
-    % \end{itemize}
-
-    \item \textbf{Phase 2: ablative analysis (Smart).} Using the most effective encoding logic derived from Phase 1 (implemented in the ``Smart'' baseline), we evaluated the impact of domain-specific optimizations through four configurations:
-    \begin{itemize}
-        \item \textbf{Smart:} The baseline solver using hybrid efficient encodings (\texttt{smart\_exactly\_k}).
-        \item \textbf{Smart + SB:} Adds Symmetry Breaking constraints (Home/Away fixing and Period Lexicographic ordering).
-        \item \textbf{Smart + DT:} Adds the \textit{Deficient Teams} implied constraints and auxiliary variables.
-        \item \textbf{Smart + SB + DT:} Combines all techniques to assess their synergistic effect.
-    \end{itemize}
-\end{enumerate}
 
 \subsubsection*{Experimental results}
 % Mandatory table format. 
@@ -377,27 +370,30 @@ The validation strategy follows a two-phase approach:
 \toprule
  & \multicolumn{8}{c}{\textbf{Decisional}} & \multicolumn{8}{c}{\textbf{Optimization}} \\
 \cmidrule(lr){2-9} \cmidrule(lr){10-17}
-\textbf{N} & \textbf{VP} & \textbf{VH} & \textbf{VS} & \textbf{VT} & \textbf{S} & \textbf{S\_DT} & \textbf{S\_SB} & \textbf{S\_SB\_DT}
+\textbf{ID} & \textbf{VP} & \textbf{VH} & \textbf{VS} & \textbf{VT} & \textbf{S} & \textbf{S\_DT} & \textbf{S\_SB} & \textbf{S\_SB\_DT}
  & \textbf{VP} & \textbf{VH} & \textbf{VS} & \textbf{VT} & \textbf{S} & \textbf{S\_DT} & \textbf{S\_SB} & \textbf{S\_SB\_DT} \\
 \midrule
 12 & 1   & 1   & 0   & 0   & 0   & 0   & 0   & 0
-   & 2\textbar\textbf{1}  & 1\textbar\textbf{1}  & 0\textbar\textbf{1}  & 1\textbar\textbf{1}  & 1\textbar\textbf{1}  & 1\textbar\textbf{1}  & 1\textbar\textbf{1}  & 1\textbar\textbf{1} \\
+   & \textbf{2}  & \textbf{1}  & \textbf{0}  & \textbf{1}  & \textbf{1}  & \textbf{1}  & \textbf{1}  & \textbf{1} \\
 14 & 2   & 2   & 0   & 2   & 1   & 1   & 1   & 1
-   & 3\textbar\textbf{1}  & 3\textbar\textbf{1}  & 4\textbar\textbf{1}  & 3\textbar\textbf{1}  & 5\textbar\textbf{1}  & 2\textbar\textbf{1}  & 4\textbar\textbf{1}  & 2\textbar\textbf{1} \\
+   & \textbf{3}  & \textbf{3}  & \textbf{4}  & \textbf{3}  & \textbf{5}  & \textbf{2}  & \textbf{4}  & \textbf{2} \\
 16 & 9   & 5   & 4   & 8   & 10  & 10  & 19  & 10
-   & 9\textbar\textbf{1}  & 17\textbar\textbf{1} & 2\textbar\textbf{1}  & 43\textbar\textbf{1} & 46\textbar\textbf{1} & 5\textbar\textbf{1}  & 68\textbar\textbf{1} & 6\textbar\textbf{1} \\
+   & \textbf{9}  & \textbf{17} & \textbf{2}  & \textbf{43} & \textbf{46} & \textbf{5}  & \textbf{68} & \textbf{6} \\
 18 & 26  & 14  & 15  & 29  & 31  & 34  & 1   & 5
-   & 45\textbar\textbf{1} & 187\textbar\textbf{1} & 73\textbar\textbf{1} & 223\textbar\textbf{1} & 121\textbar\textbf{1} & 23\textbar\textbf{1} & N/A                & 17\textbar\textbf{1} \\
+   & \textbf{45} & \textbf{187} & \textbf{73} & \textbf{223} & \textbf{121} & \textbf{23} & N/A                & \textbf{17} \\
 20 & 48  & 272 & 94  & 230 & 73  & 104 & 169 & 42
-   & N/A                 & 300\textbar{}10     & N/A                & N/A                & 300\textbar{}5      & 161\textbar\textbf{1} & N/A                & 111\textbar\textbf{1} \\
+   & N/A                 & 300\textbar{}10     & N/A                & N/A                & 300\textbar{}5      & \textbf{161} & N/A                & \textbf{111} \\
 22 & N/A & N/A & N/A & N/A & N/A & 80  & N/A & N/A
-   & N/A                 & N/A                 & N/A                & N/A                & N/A                & 300\textbar{}5      & N/A                & 195\textbar\textbf{1} \\
+   & N/A                 & N/A                 & N/A                & N/A                & N/A                & 300\textbar{}5      & N/A                & \textbf{195} \\
 \bottomrule
 \end{tabular}
 }
-\caption{Experimental results for SAT decisional and optimization models. Time in seconds.}
+\caption{Experimental results for SAT decisional and optimization models. Time is reported in seconds. In the optimization columns, bold numbers indicate the time to prove the optimal solution. Entries in the format $Time|Obj$ indicate a timeout where the solver returned the best objective value found within the time limit.}
 \label{tab:sat_results}
 \end{table}
+
+The initial encoding comparisons revealed the unexpected robustness of the \textit{Pairwise} encoding (VP), which outperformed more compact alternatives like Totalizer on instances up to $N=20$, suggesting that their stronger unit propagation outweighs the overhead of the larger formula size. The transition to structural optimizations demonstrated that explicitly encoding the DT invariant is the most effective single factor for optimization, enabling the solver to prove optimality for $N=20$ where the baseline failed. While SB alone incurred performance penalties on some instances, its synergy with DT yielded the best overall performance. A remarkable anomaly appears for $N=22$ with the \textbf{Smart+SB+DT} configuration, where the solver successfully finds the optimal solution but fails to solve the decisional version. This could be explained by the constraining power of the tight objective bound ($\beta=1$) combined with structural pruning that drastically reduces the search space, whereas the unconstrained decisional version leaves the solver navigating a vast and complex landscape without sufficient guidance.
+
 \section{SMT Model}
 % Mandatory for groups of 4. Groups of <=3 choose SAT or SMT (bonus for both)[cite: 68].
 
