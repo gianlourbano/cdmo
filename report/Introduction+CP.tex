@@ -303,9 +303,99 @@ We reduce residual symmetries via:
     \item \textbf{Period lexicographic ordering:} periods are interchangeable; we impose a lexicographic order on the vectors $\operatorname{Vector}(p) = \langle mp_{i,j,p}\rangle_{\{i,j\}\in M_1\cup\cdots\cup M_{n-1}}$ so that $\operatorname{Vector}(p) \le_{lex} \operatorname{Vector}(p+1)$ for $p=1,\dots,|\mathcal{P}|-1$.
 \end{enumerate}
 
-\subsection{Validation and Results}
-We use \texttt{Z3} via its Python API to solve the SAT encodings. Decision and optimization results (times and objectives) are those reported in our SAT study; tables and per-encoding comparisons are consistent with the standalone SAT write-up and are omitted here for brevity.
+\subsection{Validation}
+\subsubsection*{Experimental design}
+The SAT solver utilized is Z3 accessed via its Python API.
 
+The validation strategy follows a two-phase approach:
+
+\begin{enumerate}
+    \item \textbf{Phase 1: encoding selection (Vanilla).} We first performed a comparative analysis of four pure cardinality constraint encodings to identify the most robust baseline. The ``Vanilla'' solvers implement the standard constraints using \textit{Sequential Counter}, \textit{Totalizer}, \textit{Heule} and \textit{Pairwise}.
+    % \begin{itemize}
+    %     \item \textit{Sequential Counter}: Uses auxiliary variables to count literals ($O(n)$ clauses).
+    %     \item \textit{Totalizer}: Uses a divide-and-conquer tree structure ($O(n \log n)$ clauses).
+    %     \item \textit{Heule}: An efficient encoding optimized for ``exactly-one'' constraints.
+    %     \item \textit{Pairwise}: Naive encoding with quadratic/cubic complexity but strong unit propagation ($O(n^2)$ or $O(n^3)$ clauses).
+    % \end{itemize}
+
+    \item \textbf{Phase 2: ablative analysis (Smart).} Using the most effective encoding logic derived from Phase 1 (implemented in the ``Smart'' baseline), we evaluated the impact of domain-specific optimizations through four configurations:
+    \begin{itemize}
+        \item \textbf{Smart:} The baseline solver using hybrid efficient encodings (\texttt{smart\_exactly\_k}).
+        \item \textbf{Smart + SB:} Adds Symmetry Breaking constraints (Home/Away fixing and Period Lexicographic ordering).
+        \item \textbf{Smart + DT:} Adds the \textit{Deficient Teams} implied constraints and auxiliary variables.
+        \item \textbf{Smart + SB + DT:} Combines all techniques to assess their synergistic effect.
+    \end{itemize}
+\end{enumerate}
+
+\subsubsection*{Experimental results}
+% Mandatory table format. 
+% Bold = Optimal. UNSAT = Unsatisfiable. N/A or - = Time limit.
+
+% \begin{table}[h]
+%     \centering
+%     \begin{tabular}{lcccccccc}
+%         \toprule
+%         \textbf{N} & \textbf{VP} & \textbf{VH} & \textbf{VS} & \textbf{VT} & \textbf{S} & \textbf{S\_DT} & \textbf{S\_SB} & \textbf{S\_SB\_DT} \\
+%         \midrule
+%         12 & 1 & 1 & 0 & 0 & 0 & 0 & 0 & 0 \\
+%         14 & 2 & 2 & 0 & 2 & 1 & 1 & 1 & 1 \\
+%         16 & 9 & 5 & 4 & 8 & 10 & 10 & 19 & 10 \\
+%         18 & 26 & 14 & 15 & 29 & 31 & 34 & 1 & 5  \\
+%         20 & 48 & 272 & 94 & 230 & 73 & 104 & 169 & 42 \\
+%         22 & N/A & N/A & N/A & N/A & N/A & 80 & N/A & N/A \\
+%         \bottomrule
+%     \end{tabular}
+%     \caption{Experimental results for SAT decisional models. Time in seconds.}
+%     \label{tab:sat_results}
+% \end{table}
+
+% \begin{table}[h]
+%     \centering
+%     \begin{tabular}{lcccccccc}
+%         \toprule
+%         \textbf{N} & \textbf{VP} & \textbf{VH} & \textbf{VS} & \textbf{VT} & \textbf{S} & \textbf{S\_DT} & \textbf{S\_SB} & \textbf{S\_SB\_DT} \\
+%         \midrule
+%         12 & 2\textbar\textbf{1} & 1\textbar\textbf{1} & 0\textbar\textbf{1} & 1\textbar\textbf{1} & 1\textbar\textbf{1} & 1\textbar\textbf{1} & 1\textbar\textbf{1} & 1\textbar\textbf{1} \\
+%         14 & 3\textbar\textbf{1} & 3\textbar\textbf{1} & 4\textbar\textbf{1} & 3\textbar\textbf{1} & 5\textbar\textbf{1} & 2\textbar\textbf{1} & 4\textbar\textbf{1} & 2\textbar\textbf{1} \\
+%         16 & 9\textbar\textbf{1} & 17\textbar\textbf{1} & 2\textbar\textbf{1} & 43\textbar\textbf{1} & 46\textbar\textbf{1} & 5\textbar\textbf{1} & 68\textbar\textbf{1} & 6\textbar\textbf{1} \\
+%         18 & 45\textbar\textbf{1} & 187\textbar\textbf{1} & 73\textbar\textbf{1} & 223\textbar\textbf{1} & 121\textbar\textbf{1} & 23\textbar\textbf{1} & N/A & 17\textbar\textbf{1}  \\
+%         20 & N/A & 300\textbar10 & N/A & N/A & 300\textbar5 & 161\textbar\textbf{1} & N/A & 111\textbar\textbf{1} \\
+%         22 & N/A & N/A & N/A & N/A & N/A & 300\textbar5 & N/A & 195\textbar\textbf{1} \\
+%         \bottomrule
+%     \end{tabular}
+%     \caption{Experimental results for SAT optimization models. Time in seconds.}
+%     \label{tab:sat_results}
+% \end{table}
+
+\begin{table}[h]
+\centering
+\setlength{\tabcolsep}{3pt} % Riduce lo spazio tra le colonne
+\resizebox{\textwidth}{!}{% Ridimensiona la tabella per stare nei margini
+\begin{tabular}{l*{8}{c}*{8}{c}}
+\toprule
+ & \multicolumn{8}{c}{\textbf{Decisional}} & \multicolumn{8}{c}{\textbf{Optimization}} \\
+\cmidrule(lr){2-9} \cmidrule(lr){10-17}
+\textbf{N} & \textbf{VP} & \textbf{VH} & \textbf{VS} & \textbf{VT} & \textbf{S} & \textbf{S\_DT} & \textbf{S\_SB} & \textbf{S\_SB\_DT}
+ & \textbf{VP} & \textbf{VH} & \textbf{VS} & \textbf{VT} & \textbf{S} & \textbf{S\_DT} & \textbf{S\_SB} & \textbf{S\_SB\_DT} \\
+\midrule
+12 & 1   & 1   & 0   & 0   & 0   & 0   & 0   & 0
+   & 2\textbar\textbf{1}  & 1\textbar\textbf{1}  & 0\textbar\textbf{1}  & 1\textbar\textbf{1}  & 1\textbar\textbf{1}  & 1\textbar\textbf{1}  & 1\textbar\textbf{1}  & 1\textbar\textbf{1} \\
+14 & 2   & 2   & 0   & 2   & 1   & 1   & 1   & 1
+   & 3\textbar\textbf{1}  & 3\textbar\textbf{1}  & 4\textbar\textbf{1}  & 3\textbar\textbf{1}  & 5\textbar\textbf{1}  & 2\textbar\textbf{1}  & 4\textbar\textbf{1}  & 2\textbar\textbf{1} \\
+16 & 9   & 5   & 4   & 8   & 10  & 10  & 19  & 10
+   & 9\textbar\textbf{1}  & 17\textbar\textbf{1} & 2\textbar\textbf{1}  & 43\textbar\textbf{1} & 46\textbar\textbf{1} & 5\textbar\textbf{1}  & 68\textbar\textbf{1} & 6\textbar\textbf{1} \\
+18 & 26  & 14  & 15  & 29  & 31  & 34  & 1   & 5
+   & 45\textbar\textbf{1} & 187\textbar\textbf{1} & 73\textbar\textbf{1} & 223\textbar\textbf{1} & 121\textbar\textbf{1} & 23\textbar\textbf{1} & N/A                & 17\textbar\textbf{1} \\
+20 & 48  & 272 & 94  & 230 & 73  & 104 & 169 & 42
+   & N/A                 & 300\textbar{}10     & N/A                & N/A                & 300\textbar{}5      & 161\textbar\textbf{1} & N/A                & 111\textbar\textbf{1} \\
+22 & N/A & N/A & N/A & N/A & N/A & 80  & N/A & N/A
+   & N/A                 & N/A                 & N/A                & N/A                & N/A                & 300\textbar{}5      & N/A                & 195\textbar\textbf{1} \\
+\bottomrule
+\end{tabular}
+}
+\caption{Experimental results for SAT decisional and optimization models. Time in seconds.}
+\label{tab:sat_results}
+\end{table}
 \section{SMT Model}
 % Mandatory for groups of 4. Groups of <=3 choose SAT or SMT (bonus for both)[cite: 68].
 
