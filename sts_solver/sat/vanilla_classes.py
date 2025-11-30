@@ -39,17 +39,32 @@ class SATVanillaBase(SATBaseSolver):
         
         best_model = None
         optimal_imbalance = None
-        
+
+        def update_solver_timeout():
+            elapsed = time.time() - start_time_ref
+            remaining = self.timeout - elapsed
+            if remaining <= 0:
+                solver.set("timeout", 1)
+                return False
+            solver.set("timeout", int(remaining * 1000))
+            return True
+
         if not optimization:
+            if not update_solver_timeout():
+                return STSSolution(time=int(time.time() - start_time_ref), optimal=False, obj=None, sol=[])
             if solver.check() == sat:
                 best_model = solver.model()
             else:
-                return STSSolution(time=int(time.time() - start_time_ref), optimal=False, obj=None, sol=[])
+                elapsed = int(time.time() - start_time_ref)
+                return STSSolution(time=elapsed, optimal=False, obj=None, sol=[])
         else:
             print(f"Solving SAT with optimization ({self.get_metadata().name})...")
             low = 1
             high = n - 1
             while low <= high:
+                if not update_solver_timeout():
+                    print("Timeout reached before iteration.")
+                    break
                 k_mid = (low + high) // 2
                 solver.push()
                 
@@ -68,6 +83,7 @@ class SATVanillaBase(SATBaseSolver):
                     break
 
         elapsed = int(time.time() - start_time_ref)
+        print(solver.statistics())
         
         if best_model:
             weeks = range(1, n)
@@ -134,9 +150,6 @@ class SATVanillaTotalizerSolver(SATVanillaBase):
                 lits = [match_period[m][p] for m in matches_for_team]
                 totalizer_at_most_k(s, lits, 2, prefix=f"team_{t}_{p}")
 
-        elapsed = time.time() - self.start_time
-        time_left = max(0, self.timeout - elapsed)
-        s.set("timeout", int(time_left * 1000))
         
         state = {
             "match_period": match_period, 
@@ -200,9 +213,6 @@ class SATVanillaSequentialSolver(SATVanillaBase):
                 lits = [match_period[m][p] for m in matches_for_team]
                 sequential_at_most_k(s, lits, 2, prefix=f"team_{t}_{p}")
 
-        elapsed = time.time() - self.start_time
-        time_left = max(0, self.timeout - elapsed)
-        s.set("timeout", int(time_left * 1000))
 
         state = {
             "match_period": match_period, 
@@ -259,9 +269,6 @@ class SATVanillaPairwiseSolver(SATVanillaBase):
                 literals = [match_period[m][p] for m in matches_for_team_t]
                 at_most_2_pairwise(s, literals)
 
-        elapsed = time.time() - self.start_time
-        time_left = max(0, self.timeout - elapsed)
-        s.set("timeout", int(time_left * 1000))
 
         state = {
             "match_period": match_period,
@@ -351,9 +358,6 @@ class SATVanillaHeuleSolver(SATVanillaBase):
                 lits = [match_period[m][p] for m in matches_for_team]
                 at_most_2_pairwise(s, lits)
 
-        elapsed = time.time() - self.start_time
-        time_left = max(0, self.timeout - elapsed)
-        s.set("timeout", int(time_left * 1000))
 
         state = {
             "match_period": match_period,

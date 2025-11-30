@@ -61,9 +61,6 @@ class SATSmartSolver(SATVanillaBase):
                 literals = [match_period[m][p] for m in matches_for_team_t]
                 smart_at_most_k(s, literals, 2, prefix=f"team_{t}_{p}")
 
-        elapsed = time.time() - self.start_time
-        time_left = max(0, self.timeout - elapsed)
-        s.set("timeout", int(time_left * 1000))
 
         state = {
             "match_period": match_period,
@@ -147,9 +144,6 @@ class SATSmartSBSolver(SATVanillaBase):
                 period2_vector.append(match_period[m][p2])
             lex_lesseq(s, period1_vector, period2_vector, prefix=f"lex_p{p1}_p{p2}")
 
-        elapsed = time.time() - self.start_time
-        time_left = max(0, self.timeout - elapsed)
-        s.set("timeout", int(time_left * 1000))
 
         state = {
             "match_period": match_period,
@@ -245,9 +239,6 @@ class SATSmartDTSolver(SATVanillaBase):
             deficient_periods = [is_deficient[t][p] for p in periods]
             at_most_1_pairwise(s, deficient_periods)
 
-        elapsed = time.time() - self.start_time
-        time_left = max(0, self.timeout - elapsed)
-        s.set("timeout", int(time_left * 1000))
 
         state = {
             "match_period": match_period,
@@ -357,9 +348,6 @@ class SATSmartSBDTSolver(SATVanillaBase):
                 period2_vector.append(match_period[m][p2])
             lex_lesseq(s, period1_vector, period2_vector, prefix=f"lex_p{p1}_p{p2}")
 
-        elapsed = time.time() - self.start_time
-        time_left = max(0, self.timeout - elapsed)
-        s.set("timeout", int(time_left * 1000))
 
         state = {
             "match_period": match_period,
