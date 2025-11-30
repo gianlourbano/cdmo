@@ -1,147 +1,636 @@
 \documentclass{article}
-\usepackage{amsmath, amssymb}
-\usepackage{algorithm, algorithmic}
-\usepackage{booktabs}
-\usepackage{hyperref}
+
+% PACKAGES
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}   % For mathematical formatting
+\usepackage{amssymb}   % For mathematical symbols
+\usepackage{booktabs}  % For professional looking tables
+\usepackage{hyperref}  % For email addresses
+\usepackage{geometry}  % Standard margins (default article margins are usually fine, but do not customize further)
 \usepackage{graphicx}
-\usepackage{xcolor}
 
-\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue, citecolor=blue}
 
-% Macros (mathematical, no layout changes)
-\newcommand{\Teams}{\ensuremath{n}} % number of teams (even)
-\newcommand{\Weeks}{\ensuremath{n-1}}
-\newcommand{\Periods}{\ensuremath{n/2}}
-\newcommand{\PairSet}{\ensuremath{\{(i,j)\mid 1\le i<j\le n\}}}
-\newcommand{\Imax}{\ensuremath{\mathcal{I}_{\max}}}
-\newcommand{\Dsum}{\ensuremath{\mathcal{D}_{\Sigma}}}
+% INSTRUCTIONS (Read and remove before submission):
+% 1. Do not change fonts, font size, or margins.
+% 2. Page limit: 12 pages (3 approaches) or 15 pages (all approaches), excluding authenticity/refs.
+% 3. Use high-level mathematical language. Do NOT copy-paste code.
+% 4. Do not be verbose[cite: 3].
 
-% Title (replace placeholders appropriately)
-\title{Project Title: Scheduling Optimization Approaches}
+\title{Project Title} % [cite: 1]
+
+% Alphabetical order, Name, Lastname, UniBo email [cite: 2]
 \author{Gianlorenzo Urbano (gianlorenzo.urbano@studio.unibo.it)\\Luca Lucioli (luca.lucioli@studio.unibo.it)\\Michelangelo Urbano (michelangelo.urbano@studio.unibo.it)}
 \date{\today}
 
-\begin{document}\maketitle
+\begin{document}
 
-% =============================================================
-\section{Introduction (Common Elements)}
-We consider a round-robin tournament with $\Teams$ even, $\Weeks = \Teams-1$ weeks, and $\Periods = \Teams/2$ simultaneous periods each week. Each unordered pair $(i,j)\in\PairSet$ must be scheduled exactly once; the oriented match $(h,a)$ records a home team $h$ and an away team $a$.
+\maketitle
 
-\paragraph{Canonical Week Decomposition (Circle Method).} Let the pivot team be $\Teams$ and the remaining teams form a cyclic array $C=(1,2,\dots,\Teams-1)$. For week $w\in\{0,\dots,\Weeks-1\}$ define the matching set
-\begin{equation}
-M_w = \{(\Teams, C_w)\} \cup \Big\{(\min(C_{w+k}, C_{w-k}),\max(C_{w+k}, C_{w-k})) : k=1,\dots,\tfrac{\Teams}{2}-1 \Big\},
-\end{equation}
-where indices are taken modulo $(\Teams-1)$. This yields a partition $(M_0,\dots,M_{\Weeks-1})$ of $\PairSet$ and fixes the week of every pair. The remaining decisions are: period assignment $p_{i,j}\in\{1,\dots,\Periods\}$ and orientation $o_{i,j}\in\{0,1\}$ (e.g. $o_{i,j}=1$ iff $i$ is home).
+\section{Introduction}
 
-\paragraph{Shared Structural Constraints.} For all pairs $(i,j)$ with $i<j$ and weeks $w$ and periods $p$:
+In this project, we address a specific variant of the Sports Tournament Scheduling (STS) problem by employing a decomposition strategy. Instead of solving the full problem monolithically, we utilize the \textit{Circle Method} (canonical 1-factorization) as a pre-processing step to statically fix the weekly schedule. This approach reduces the combinatorial complexity of the decision and optimization tasks for our solvers (CP, SAT, MIP, SMT) to two specific sub-problems: assigning the pre-determined matches to periods and determining the home/away status.
+The following sections detail the mathematical formalization common to all our models, the algorithmic details of the pre-processing, and the theoretical properties inherent to the problem structure.
+
+
+\subsection{Common Formalization}
+The following formalization is shared across all approaches.
+    \subsubsection{Input Parameters:}
+    \begin{itemize}
+        \item Number of teams $n$ (even) and the set of teams $\mathcal{T} = \{1, \dots, n\}$.
+        \item Number of weeks $n_{weeks} = n-1$ and the set of weeks $\mathcal{W} = \{1, \dots, n-1\}$.
+        \item Number of periods $n_{periods} = n/2$ and the set of periods $\mathcal{P} = \{1, \dots, n/2\}$.
+        \item The pre-computed match-week matrix $W$, where $W_{ij} \in \mathcal{W}$ denotes the week in which team $i$ plays team $j$.
+    \end{itemize}
+    \subsubsection{Decision Variables:}
+    \begin{itemize}
+        \item $\pi_{ij} \in \mathcal{P}$: The period assigned to the match between teams $i$ and $j$ ($i < j$).
+        \item $h_{ij} \in \{0, 1\}$: Boolean variable, $1$ if team $i$ plays Home against $j$, $0$ otherwise ($i < j$).
+    \end{itemize}
+    \subsubsection{Objective Function and Bounds}
+    To minimize the disparity between home and away games, we introduce the objective variable $\beta$ representing the \textit{Total Imbalance}.
+    For each team $t \in \mathcal{T}$, we define:
+    \begin{itemize}
+        \item $H_t = \sum_{j \in \mathcal{T}, j \neq t} h_{tj}$: The total number of home games played by team $t$.
+        \item $A_t = \sum_{j \in \mathcal{T}, j \neq t} (1 - h_{tj})$: The total number of away games played by team $t$.
+        \item $\delta_t = |H_t - A_t|$: The individual imbalance for team $t$.
+    \end{itemize}
+    The optimization goal is to minimize the maximum individual imbalance:
+    $$ \text{minimize } \beta \quad \text{subject to} \quad \beta = \max_{t \in \mathcal{T}} \delta_t $$ \textbf{Bounds:} Since the total number of games per team is $n-1$ (which is odd given that $n$ is even), perfect balance ($\delta_t=0$) is impossible. The minimum possible difference is 1 (e.g., $\frac{n}{2}$ home vs $\frac{n}{2}-1$ away). The maximum possible difference occurs if a team plays all games at home or away ($n-1$). Therefore, the domain of the objective variable is:
+    $$ \beta \in [1, n-1] $$
+
+
+
+\subsection{Pre-processing: The Circle Method.}
+Let $n$ be the even number of teams. We designate team $n$ as the fixed \textit{pivot}. The remaining $n-1$ teams form the "circle", represented formally as an ordered sequence $C = (c_0, c_1, \dots, c_{n-2})$ where $c_i \in \{1, \dots, n-1\}$.
+To analyze the impact of the initial configuration, we implemented two variants for $C$:
+\begin{enumerate}
+    \item Standard: $C = (1, 2, \dots, n-1)$.
+    \item Rotated: $C = (2, 3, \dots, n-1, 1)$, obtained by shifting the first element to the end.
+\end{enumerate}
+The schedule consists of $n-1$ weeks, indexed by $w \in \{0, \dots, n-2\}$. For each week $w$, the set of matches is generated using modular arithmetic on the indices of $C$:
 \begin{itemize}
-	\item \textit{Pair uniqueness}: each $(i,j)$ appears exactly once overall (enforced implicitly by the partition $M_w$ above).
-	\item \textit{Weekly participation}: $\forall i$ and $\forall w$: $i$ occurs in exactly one match of $M_w$.
-	\item \textit{Slot occupancy}: for each $w$ and $p$, exactly one pair with week $w$ is assigned period $p$.
-	\item \textit{Period appearance cap}: $\forall i,\forall p$: $\sum_{w} [p_{i,j}=p \text{ for the unique } (i,j)\in M_w \text{ containing } i] \le 2$.
+    \item The pivot plays against the team at index $w$: $\{n, c_w\}$.
+    \item For every offset $k \in \{1, \dots, \frac{n}{2}-1\}$, the team at index $(w+k) \pmod{n-1}$ plays against the team at index $(w-k) \pmod{n-1}$.
 \end{itemize}
-
-\paragraph{Symmetries and Their Breaking.} The canonical week decomposition removes rotational symmetry of weeks (cyclic shifts of the schedule). Residual symmetries common to our strongest formulations are:
+The aggregation of these matches for all $w$ yields the fixed weekly schedule, formally denoted hereafter as the matrix $W$ (where $W_{ij}$ indicates the week in which team $i$ plays team $j$).
+This construction strictly guarantees the satisfaction of the following constraints: 
 \begin{itemize}
-	\item \textit{Within-week period permutation}: simultaneous relabeling $p\mapsto \pi(p)$ for a permutation $\pi$ leaves feasibility unchanged. Broken by fixing an order on a distinguished subset of pairs in week $0$, e.g. $p_{\Teams, C_0}=1 < p_{a_1,b_1} < p_{a_2,b_2} < \dots$.
-	\item \textit{Global home/away flip} per pair: for any subset $S\subseteq \PairSet$, replacing $(o_{i,j})$ by $(1-o_{i,j})$ preserves structural constraints. Broken by anchoring orientations of a small seed set, e.g. $o_{\Teams, C_0}=1$ and $o_{1,j}=1$ for $j\in\{2,3\}$.
-	\item \textit{Reflection of the circle}: mapping indices $k\mapsto (\Teams-1)-k$ induces $M_w \leftrightarrow M_{-w}$; already eliminated by fixing the explicit $M_w$ construction and ordering constraints on $p_{i,j}$ in $M_0$.
+    \item Every team plays with every other team exactly once.
+    \item Every team plays exactly one match per week.
+\end{itemize} \cite{wiki:roundrobin}.
+
+
+\subsection{Implicit Properties and Symmetries}
+We identify specific theoretical properties and symmetries inherent to the problem structure, as analyzed in the literature \cite{hamiez2004}.
+\paragraph{Implicit Properties.}
+Is identified a structural invariant common to all solutions of this problem, referred to as the \textit{Deficient Teams} property.
+Theoretical analysis shows that in any valid schedule, for every period $p$, the set of teams partitions into two distinct subsets:
+\begin{itemize}
+    \item A set $\mathcal{D}_p$ consisting of exactly two teams (called "deficient") that appear exactly once in period $p$.
+    \item The remaining $n-2$ teams, which appear exactly twice in period $p$.
+    \item Furthermore, for any two distinct periods $p$ and $p'$, the deficient teams of $p$ appear twice in $p'$ (implying $\mathcal{D}_p \cap \mathcal{D}_{p'} = \emptyset$).
 \end{itemize}
+This property is intrinsic to the combinatorial structure of the problem and can be exploited later to define implicit constraints.
 
-\paragraph{Formal Symmetry-Breaking Constraints.} Let $F_0= M_0 = \{(\Teams,C_0),(a_1,b_1),\dots,(a_{m},b_{m})\}$ with $m=\tfrac{\Teams}{2}-1$. We enforce a strictly increasing (or relaxed increasing) ordering
-\begin{equation}\label{eq:period-order}
- p_{\Teams,C_0} < p_{a_1,b_1} < p_{a_2,b_2} < \dots < p_{a_m,b_m},
-\end{equation}
-which selects a unique representative of the orbit under permutations $\pi\in S_{\Periods}$ acting on period labels within week $0$. Orientation anchoring fixes a balanced prefix/suffix pattern:
-\begin{equation}\label{eq:home-anchor}
- o_{1,j}=1 \;\text{for}\; j\in\{2,\dots,\tfrac{\Teams}{2}\},\quad o_{1,j}=0 \;\text{for}\; j\in\{\tfrac{\Teams}{2}+1,\dots,\Teams-1\},
-\end{equation}
-breaking the global involution $o_{i,j}\mapsto 1-o_{i,j}$ and reducing symmetric home/away distributions.
 
-\paragraph{Implicit Distribution (Deficiency Pattern).} Define cumulative period occurrences
-\begin{equation}
- \operatorname{occ}_{t,p} = \sum_{j\ne t} [p_{t,j}=p], \qquad t\in\{1,\dots,\Teams\},\; p\in\{1,\dots,\Periods\}.
-\end{equation}
-Under (i) pair uniqueness, (ii) weekly participation, (iii) slot occupancy and (iv) per-period cap $\operatorname{occ}_{t,p}\le 2$, the multiset $\{\operatorname{occ}_{t,p}: t\}$ for any fixed $p$ must contain exactly $2$ ones and $\Teams-2$ twos. Indeed, total appearances in period $p$ equal number of weeks $=\Weeks=\Teams-1$ and with each team contributing either $1$ or $2$ appearances (cap), the only feasible composition solving
-\begin{equation}
- \sum_{t} \operatorname{occ}_{t,p} = \Teams -1, \quad \operatorname{occ}_{t,p}\in\{1,2\}
-\end{equation}
-is $2\cdot 1 + (\Teams-2)\cdot 2 = \Teams -1$. Marking deficiency via $d_{t,p}=[\operatorname{occ}_{t,p}=1]$, constraints
-\begin{equation}\label{eq:deficiency}
- \sum_{t} d_{t,p}=2, \qquad \sum_{p} d_{t,p}\le 1
-\end{equation}
-capture that each team can be deficient in at most one period. These are implied by structural constraints and prune assignments failing the forced global distribution early.
+\paragraph{Symmetries}
+This problem is intrinsically symmetric in fact equivalent solutions can typically be obtained through several transformations:
+\begin{itemize}
+    \item Team Permutation: Renumbering the teams (e.g., swapping Team 1 and Team 2) results in an equivalent solution.
+    \item Week Permutation: Swapping the entire schedule of two distinct weeks preserves the validity of the tournament.
+    \item Period Permutation: The periods are indistinguishable; swapping the matches of period $p_i$ with period $p_j$ creates an equivalent valid schedule.
+\end{itemize} However, in our specific approach, the pre-processing phase (Circle Method) produces a fixed match-week matrix $W$. This constant input inherently breaks the Team and Week permutation symmetries, as the specific pairings for every week are pre-determined.
 
-\paragraph{Effect.} Constraints (\ref{eq:period-order})--(\ref{eq:deficiency}) eliminate factorial period permutations, orientation complements and circle reflections while enforcing the unique deficiency pattern, drastically shrinking the search space without altering the feasible solution set.
 
-\paragraph{Fairness Objectives.} Let $H_i=\sum_{(i,j)} o_{i,j}$ and $A_i=\sum_{(j,i)} (1-o_{j,i})$ counting home and away appearances (after normalizing orientation per unordered pair). Two objective metrics are shared: minimax imbalance $\Imax = \max_i |H_i-A_i|$ and aggregate deviation $\Dsum=\sum_i |H_i-A_i|$. Bounds follow from $H_i+A_i=\Weeks$: $0\le \Imax \le \Weeks$ and $0\le \Dsum \le \Teams\,\Weeks$.
 
-\paragraph{Preprocessing Impact.} Fixing weeks via $(M_w)$ collapses the decision space from ordering both weeks and periods to ordering periods only; symmetry breaking acts then chiefly on period permutations and small orientation flips, dramatically reducing equivalent search states in every formulation without referencing modeling specifics.
 
-% =============================================================
+
+
+
+
+
 \section{CP Model}
-\subsection{Decision Variables}
-Example: $\text{period}_{i,j}\in\{1,\dots,\Periods\}$ for $(i,j)\in\PairSet$, and $\text{home}_{i,j}\in\{0,1\}$ (1 iff $i$ is home). Domains are finite and integral.
-\subsection{Objective Function}
-If optimization enabled, minimize $\Imax$ via auxiliary variables $d_i\ge |H_i-A_i|$ and $I\ge d_i$ for all $i$, objective $\min I$. Bounds described in Section 1.
+% Mandatory for all groups[cite: 14].
+
+
+\subsection{Decision variables}
+
+We adopt the decision variables $\pi_{ij}$ and $h_{ij}$ formally defined in the Common Formalization (see Section 1).
+However, specific to the CP implementation, the domain of the period variable is extended to $\mathcal{P} \cup \{0\}$.
+Semantically, the value $0$ is reserved to represent the concept of a "null period" (applicable to diagonal entries where $i=j$), while values in $\mathcal{P}$ denote valid tournament periods.
+
+
+
+
+
+\subsection{Objective function}
+The optimization goal is to minimize the \textit{Total Imbalance} $\beta$.
+The auxiliary variables required to compute it ($H_t$, $A_t$, and $\delta_t$) are implemented exactly as defined in the Common Formalization (see Section 1). Furthermore, the bounds derived from the parity properties discussed in Section 1 (i.e., that a perfect balance of 0 is impossible for an even number of teams) are enforced as domain constraints:
+$$ 1 \le \beta \le n-1 $$
 \subsection{Constraints}
-Main constraints instantiate uniqueness, weekly participation, slot occupancy and period cap using global constraints (e.g., counting constraints over $\text{period}_{i,j}$). Orientation does not affect feasibility.\newline
-Implied constraints: fix ordering for a reference week to eliminate rotational symmetry of weeks.\newline
-Symmetry breaking: impose lexicographic ordering on $(\text{period}_{i,j})$ for a subset of pairs with common team to reduce equivalent permutations.
+% Start with main strictly necessary constraints[cite: 27].
+% Use global constraints where applicable (e.g., $allDifferent$)[cite: 26].
+The CP formulation leverages the pre-computed match-week matrix $W$ (defined in the Common Formalization, Section 1) as a fixed input parameter. The constraints are organized into three categories: main constraints, which ensure the strict validity of the schedule; implied constraints, introduced to improve propagation efficiency; and  symmetry-breaking constraints, employed to eliminate symmetric equivalent solutions.
+
+
+\subsubsection{Main Constraints}
+The following constraints are strictly necessary to define a valid solution to the STS problem.
+
+\paragraph{Matrix Properties (Validity and Symmetry).}
+The variable matrix $\pi$ must maintain a symmetric structure to reflect the undirected nature of the matches. Since the match $\{i,j\}$ is identical to the match $\{j,i\}$, both entries must be assigned to the same valid period in $\mathcal{P}$, while self-assignments are null:
+$$ \forall i, j \in \mathcal{T}, i \neq j: \quad \pi_{ij} \in \mathcal{P} \quad \land \quad \pi_{ij} = \pi_{ji} $$
+$$ \forall i \in \mathcal{T}: \quad \pi_{ii} = 0 $$
+\textit{Implementation:} This is enforced by imposing inequality constraints ($\pi_{ij} \neq 0$) for off-diagonal entries and equality constraints ($\pi_{ij} = \pi_{ji}$) for all $i < j$ to guarantee the symmetric structure of the decision variables.
+
+\paragraph{Home/Away Consistency.}
+The home/away roles must be reciprocal. If team $i$ plays Home against $j$, team $j$ must necessarily play Away against $i$:
+$$ \forall i, j \in \mathcal{T}, i < j: \quad h_{ji} = 1 - h_{ij} $$
+\textit{Implementation:} The implementation follows the definition directly. We enforce a strict arithmetic equality between the symmetric entries of the Boolean matrix $h$, ensuring that $h_{ji}$ is always the complement of $h_{ij}$.
+
+\paragraph{Period Usage.}
+Each team can play at most twice within the same period $p$ over the tournament. Mathematically:
+$$ \forall t \in \mathcal{T}, \forall p \in \mathcal{P}: \quad \sum_{j \in \mathcal{T}, j \neq t} \mathbb{I}(\pi_{tj} = p) \le 2 $$
+\textit{Implementation:} This requirement is enforced using the global constraint \texttt{count\_geq}$(x, y, c)$, which constrains the parameter $c$ to be greater than or equal to the number of occurrences of value $y$ in array $x$.
+By setting $c=2$, we effectively impose that $2 \ge \text{occurrences}$, which satisfies the "at most 2" requirement.
+Crucially, we annotated this constraint with \texttt{domain\_propagation} to enforce \emph{Generalized Arc Consistency (GAC)}.
+Experimental testing revealed that this specific formulation yielded better solving times than alternative global constraints such as \texttt{global\_cardinality\_closed}.
+
+\paragraph{Weekly Structure.}
+The pre-processing phase (Circle Method) assigns each match $\{i,j\}$ to a specific week $W_{ij}$. We must ensure that for every week $w$ and every period $p$, exactly one match is scheduled:
+$$ \forall w \in \mathcal{W}, \forall p \in \mathcal{P}: \quad \sum_{i < j, \, W_{ij}=w} \mathbb{I}(\pi_{ij} = p) = 1 $$
+\textit{Implementation:} The implementation is a direct translation of the formulation above. We simply sum the Boolean indicators for the specific subset of matches belonging to week $w$ (i.e., those where $W_{ij}=w$) and constrain the result to be exactly 1.
+A variant using the \texttt{alldifferent} global constraint on the period variables of each week was also tested but resulted in lower performance compared to this summation formulation.
+
+\subsubsection{Implied constraints}
+
+To enhance propagation efficiency, we leverage the structural properties derived from the \textit{Deficient Teams} invariant previously discussed in Section 1.3 \cite{hamiez2004}. Although redundant for correctness, enforcing these properties narrows the search space significantly.
+
+\paragraph{Deficient Teams Structure.}
+As established, for every period $p$, exactly two teams must play exactly once (deficient), while the remaining $n-2$ teams must play exactly twice.
+We enforce these two conditions mathematically as follows:
+\begin{align}
+    \forall p \in \mathcal{P}: \quad & \sum_{t \in \mathcal{T}} \mathbb{I}\left( \sum_{j \neq t} \mathbb{I}(\pi_{tj} = p) = 1 \right) = 2 \label{eq:def1} \\
+    \forall p \in \mathcal{P}: \quad & \sum_{t \in \mathcal{T}} \mathbb{I}\left( \sum_{j \neq t} \mathbb{I}(\pi_{tj} = p) = 2 \right) = n - 2 \label{eq:def2}
+\end{align}
+\textit{Implementation:} We implemented equations (\ref{eq:def1}) and (\ref{eq:def2}) using nested Boolean indicators evaluated directly on the decision variables $\pi_{tj}$, without reifying the intermediate occurrence counts into auxiliary integer variables.
+This formulation creates a direct propagation path from the period assignments to the constraints, which was empirically observed to be significantly faster than alternatives based on \texttt{global\_cardinality\_closed} or \texttt{count\_eq}.
+
+\paragraph{Unique Deficiency per Team.}
+Furthermore, theoretical analysis implies that each team is deficient in exactly one period across the entire tournament.
+In our CP model, we enforce a relaxed version of this property:
+\begin{equation}
+    \forall t \in \mathcal{T}: \quad \sum_{p \in \mathcal{P}} \mathbb{I}(\text{is\_deficient}(t, p)) \le 1 \label{eq:def3}
+\end{equation}
+where the Boolean auxiliary variable $\text{is\_deficient}(t, p)$ is formally defined by the equivalence:
+$$ \text{is\_deficient}(t, p) \iff \left( \sum_{j \in \mathcal{T}, j \neq t} \mathbb{I}(\pi_{tj} = p) = 1 \right) $$
+\textit{Implementation:} We enforce this using the global constraint \texttt{count\_leq}$(x, y, c)$, which imposes the condition $c \le |\{k \mid x_k = y\}|$. 
+By mapping $x$ to the team's deficiency indicators ($[\text{is\_deficient}_{tp} \mid p \in \mathcal{P}]$), setting the target value $y=\texttt{true}$, and the threshold $c=1$, we effectively constrain each team to be deficient in at least one period (i.e., $\sum_{p} \mathbb{I}(\text{is\_deficient}_{tp}) \ge 1$).
+Although the strict theoretical requirement is "exactly 1", enforcing the weaker "at least 1" condition proved computationally more efficient while still providing sufficient filtering power. The strict "exactly 1" condition is implicitly satisfied when combined with the other model constraints. However, in the optimization models, where strong propagation is critical to prune suboptimal branches, we explicitly enforce the upper bound as well using a semantically redundant constraint:
+$$ \sum_{p \in \mathcal{P}} \mathbb{I}(\text{is\_deficient}_{tp}) \le 1 $$
+This creates a hybrid formulation where the global constraint enforces the lower bound and the linear constraint enforces the upper bound. Experimental evidence confirmed that this combination significantly improves solving efficiency compared to using either constraint in isolation, likely by enabling stronger domain pruning through complementary propagators.
+
+\subsubsection{Symmetry breaking constraints}
+As discussed in Section 1.3 \cite{hamiez2004}, the problem exhibits specific symmetries that survived the pre-processing phase. We introduce additional constraints to eliminate equivalent solutions and select a unique canonical representative for each symmetry class.
+
+\paragraph{Period Ordering.}
+Since the period labels $p \in \mathcal{P}$ are arbitrary and indistinguishable, simply renumbering the periods results in an equivalent solution. To break this symmetry, we impose a strict ordering on the periods assigned to the matches of the first week ($w=1$).
+Let $S_1$ be the sequence of period variables corresponding to the matches scheduled in week 1, ordered by team index:
+$$ S_1 = \langle \pi_{ij} \mid i < j, \, W_{ij} = 1 \rangle $$
+\textit{Implementation:} We enforce that the sequence $S_1$ must be non-decreasing using the global constraint \texttt{increasing}$(S_1)$.
+This effectively forces the solver to explore only one permutation of the periods for the first week (e.g., mapping the first match to period 1, the second to period 2, etc., as much as satisfying validity allows).
+Experimental results indicated that the \texttt{increasing} constraint provides a better trade-off between propagation cost and search space reduction compared to variants like \texttt{strictly\_increasing} or \texttt{lex\_lesseq}.
+
+\paragraph{Home/Away Symmetry.}
+The strategy to break the home/away reflection symmetry differs depending on the problem version:
+
+\begin{enumerate}
+    \item \textit{Decision Version:} Since no objective function is present, the home/away balance is irrelevant. We can arbitrarily fix the entire home/away structure to remove all symmetries and variables. We enforce that the team with the lower index always plays Home:
+    $$ \forall i, j \in \mathcal{T}, i < j: \quad h_{ij} = 1 $$
+    This trivializes the search for $h$ variables, leaving the solver to focus solely on period assignments.
+
+    \item \textit{Optimization Version:} We cannot fix all roles because the imbalance objective $\beta$ depends on the specific distribution of home games. However, we can still break the global "mirror" symmetry (swapping Home/Away for everyone) by fixing the schedule of a single pivot team (Team 1).
+    We force Team 1 to play Home for the first half of its opponents and Away for the second half:
+    $$ \forall j \in \mathcal{T} \setminus \{1\}: \quad h_{1j} = \begin{cases} 1 & \text{if } j \le n/2 \\ 0 & \text{if } j > n/2 \end{cases} $$
+\end{enumerate}
+\textit{Implementation:} These constraints are implemented as direct equality assignments on the $h_{ij}$ variables.
+
+
+
 \subsection{Validation}
-\paragraph{Experimental Design.} Backend: MiniZinc with Gecode (mandatory) and Chuffed (optional). Time limit $T$ seconds per instance. Instances: $n\in\{4,6,8,10,12,14,16\}$.\newline
-\paragraph{Experimental Results.} Table template (runtime seconds or objective values; UNSAT / N/A markers):
+% Implement in MiniZinc, run with at least Gecode[cite: 32].
+
+\subsubsection*{Experimental design}
+% Detail hardware, software, time limits, and strategies used. Results must be reproducible[cite: 37, 38].
+
+\subsubsection*{Experimental results}
+% Mandatory table format[cite: 41]. 
+% Bold = Optimal. UNSAT = Unsatisfiable. N/A or - = Time limit [cite: 48-50].
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{lcccc}
+        \toprule
+        \textbf{ID} & \textbf{Appr. 1 (e.g., Chuffed)} & \textbf{Appr. 2 (e.g., Gecode)} & \textbf{...} & \textbf{...} \\
+        \midrule
+        1 & \textbf{100} & 120 & 80 & - \\
+        2 & 50 & 60 & N/A & N/A \\
+        3 & UNSAT & UNSAT & N/A & N/A \\
+        \bottomrule
+    \end{tabular}
+    \caption{Experimental results showing runtime (s) or best objective value.}
+    \label{tab:cp_results}
+\end{table}
+
+\section{SAT Model}
+
+\subsection{Overview and Strategy}
+Consistent with the project-wide decomposition, we use the \textit{Circle Method} (Section 1.2) to fix the weekly matches, yielding the matrix $W$. The SAT model therefore decides only: (i) the \textit{period assignment} of each pre-determined match; and (ii) its \textit{home/away} orientation. Structural constraints are encoded with Boolean variables and cardinality encodings.
+
+\subsection{Decision variables}
+Given teams $\mathcal{T}=\{1,\dots,n\}$, weeks $\mathcal{W}=\{1,\dots,n-1\}$, and periods $\mathcal{P}=\{1,\dots,n/2\}$, we introduce:
+\begin{itemize}
+    \item $mp_{i,j,p}$: Boolean channel of the integer period variable $\pi_{ij}$ (Section 1). For $i<j$ and $p\in\mathcal{P}$, $mp_{i,j,p}=\texttt{true}$ iff match $\{i,j\}$ (whose week $w=W_{ij}$ is fixed by preprocessing) is played in period $p$.
+    \item $h_{i,j}$: for $i<j$, $h_{i,j}=\texttt{true}$ iff team $i$ plays Home against $j$ (thus $h_{j,i}=\lnot h_{i,j}$ by reciprocity).
+\end{itemize}
+To exploit the \textit{Deficient Teams} structure (Section 1.3), we also use:
+\begin{itemize}
+    \item $def_{t,p}$: $\texttt{true}$ iff team $t$ is \emph{deficient} in period $p$, i.e., it plays exactly one match in period $p$ over the whole tournament.
+\end{itemize}
+
+\subsection{Objective function}
+Optimization is handled by a binary search on the imbalance variable $\beta$ (Section 1). For a fixed candidate bound $\beta$, each team $t$ must satisfy:
+\[
+\Big\lceil\tfrac{(n-1)-\beta}{2}\Big\rceil \;\le\; \sum_{j\ne t} \mathbb{I}(t \text{ plays Home vs } j) \;\le\; \Big\lfloor\tfrac{(n-1)+\beta}{2}\Big\rfloor.
+\]
+We iteratively solve SAT decision problems, tightening the bound until minimal $\beta$ is found.
+
+\subsection{Constraints}
+\paragraph{Main constraints.}
+\begin{enumerate}
+    \item \textbf{Unique period assignment:} each match $\{i,j\}$ is assigned to exactly one period:
+    \[\sum_{p\in\mathcal{P}} mp_{i,j,p} = 1.\]
+    % Implemented with Exactly-One (pairwise) clauses.
+
+    \item \textbf{Slot capacity:} for every week $w$ and period $p$, exactly one match of week $w$ occupies period $p$:
+    \[\sum_{\{i,j\}\in M_w} mp_{i,j,p} = 1 \quad (w\in\mathcal{W},\ p\in\mathcal{P}).\]
+    % Encoded with Exactly-One (pairwise) clauses.
+
+    \item \textbf{Per-team per-period cap:} each team appears in at most 2 matches in the same period across the season:
+    \[\sum_{j\ne t} mp_{t,j,p} \le 2 \quad (t\in\mathcal{T},\ p\in\mathcal{P}).\]
+    % Encoded with At-Most-2 (pairwise) clauses.
+\end{enumerate}
+
+\paragraph{Implied constraints (Deficient Teams).}
+Using $def_{t,p}$ to capture deficiency:
+\begin{enumerate}
+    \item \textbf{Definition:}
+    \[
+    def_{t,p} \iff \Big(\sum_{j\ne t} mp_{t,j,p} = 1\Big).
+    \]
+    Implemented by implications enforcing at-least-one and not-at-least-two; at-least-three is excluded by the main cap.
+
+    \item \textbf{Exactly two deficient per period:}
+    \[\sum_{t\in\mathcal{T}} def_{t,p} = 2 \quad (p\in\mathcal{P}).\]
+    Encoded using the \textit{Sequential Counter} encoding.
+
+    % Encoded with an Exactly-$k$ Totalizer.
+
+    \item \textbf{At most one deficient period per team:}
+    \[\sum_{p\in\mathcal{P}} def_{t,p} \le 1 \quad (t\in\mathcal{T}).\]
+    Encoded using \textit{Pairwise} at-most-one clauses.
+    % Encoded with At-Most-1 (pairwise) clauses.
+\end{enumerate}
+
+\paragraph{Symmetry breaking.}
+We reduce residual symmetries via:
+\begin{enumerate}
+    \item \textbf{Home/Away symmetry:} fix Team 1's orientation pattern along weeks: it plays Home in the first $\lfloor (n-1)/2\rfloor$ matches and Away thereafter (ordered by week), anchoring the global flip.
+    \item \textbf{Period lexicographic ordering:} periods are interchangeable; we impose a lexicographic order on the vectors $\operatorname{Vector}(p) = \langle mp_{i,j,p}\rangle_{\{i,j\}\in M_1\cup\cdots\cup M_{n-1}}$ so that $\operatorname{Vector}(p) \le_{lex} \operatorname{Vector}(p+1)$ for $p=1,\dots,|\mathcal{P}|-1$.
+\end{enumerate}
+
+\subsection{Validation}
+\subsubsection*{Experimental design}
+The SAT solver utilized is Z3 accessed via its Python API.
+
+The validation strategy follows a two-phase approach: in the first phase (\textit{Vanilla}) we performed a comparative analysis of four pure cardinality constraint encodings to identify the most robust baseline. The ``Vanilla'' solvers implement the standard constraints using \textit{Pairwise} (VP in the table), \textit{Heule} (VH), \textit{Sequential Counter} (VS) and \textit{Totalizer} (VT). Using the most effective encoding logic derived from the previous phase (implemented in the ``Smart'' baseline), we evaluated the impact of domain-specific optimizations through four configurations:
+\begin{itemize}
+    \item \textbf{Smart:} The baseline solver using hybrid efficient encodings (\texttt{smart\_exactly\_k}).
+    \item \textbf{Smart + SB:} Adds Symmetry Breaking constraints (Home/Away fixing and Period Lexicographic ordering).
+    \item \textbf{Smart + DT:} Adds the \textit{Deficient Teams} implied constraints and auxiliary variables.
+    \item \textbf{Smart + SB + DT:} Combines all techniques to assess their synergistic effect.
+\end{itemize}
+    
+
+
+\subsubsection*{Experimental results}
+% Mandatory table format. 
+% Bold = Optimal. UNSAT = Unsatisfiable. N/A or - = Time limit.
+
+% \begin{table}[h]
+%     \centering
+%     \begin{tabular}{lcccccccc}
+%         \toprule
+%         \textbf{N} & \textbf{VP} & \textbf{VH} & \textbf{VS} & \textbf{VT} & \textbf{S} & \textbf{S\_DT} & \textbf{S\_SB} & \textbf{S\_SB\_DT} \\
+%         \midrule
+%         12 & 1 & 1 & 0 & 0 & 0 & 0 & 0 & 0 \\
+%         14 & 2 & 2 & 0 & 2 & 1 & 1 & 1 & 1 \\
+%         16 & 9 & 5 & 4 & 8 & 10 & 10 & 19 & 10 \\
+%         18 & 26 & 14 & 15 & 29 & 31 & 34 & 1 & 5  \\
+%         20 & 48 & 272 & 94 & 230 & 73 & 104 & 169 & 42 \\
+%         22 & N/A & N/A & N/A & N/A & N/A & 80 & N/A & N/A \\
+%         \bottomrule
+%     \end{tabular}
+%     \caption{Experimental results for SAT decisional models. Time in seconds.}
+%     \label{tab:sat_results}
+% \end{table}
+
+% \begin{table}[h]
+%     \centering
+%     \begin{tabular}{lcccccccc}
+%         \toprule
+%         \textbf{N} & \textbf{VP} & \textbf{VH} & \textbf{VS} & \textbf{VT} & \textbf{S} & \textbf{S\_DT} & \textbf{S\_SB} & \textbf{S\_SB\_DT} \\
+%         \midrule
+%         12 & 2\textbar\textbf{1} & 1\textbar\textbf{1} & 0\textbar\textbf{1} & 1\textbar\textbf{1} & 1\textbar\textbf{1} & 1\textbar\textbf{1} & 1\textbar\textbf{1} & 1\textbar\textbf{1} \\
+%         14 & 3\textbar\textbf{1} & 3\textbar\textbf{1} & 4\textbar\textbf{1} & 3\textbar\textbf{1} & 5\textbar\textbf{1} & 2\textbar\textbf{1} & 4\textbar\textbf{1} & 2\textbar\textbf{1} \\
+%         16 & 9\textbar\textbf{1} & 17\textbar\textbf{1} & 2\textbar\textbf{1} & 43\textbar\textbf{1} & 46\textbar\textbf{1} & 5\textbar\textbf{1} & 68\textbar\textbf{1} & 6\textbar\textbf{1} \\
+%         18 & 45\textbar\textbf{1} & 187\textbar\textbf{1} & 73\textbar\textbf{1} & 223\textbar\textbf{1} & 121\textbar\textbf{1} & 23\textbar\textbf{1} & N/A & 17\textbar\textbf{1}  \\
+%         20 & N/A & 300\textbar10 & N/A & N/A & 300\textbar5 & 161\textbar\textbf{1} & N/A & 111\textbar\textbf{1} \\
+%         22 & N/A & N/A & N/A & N/A & N/A & 300\textbar5 & N/A & 195\textbar\textbf{1} \\
+%         \bottomrule
+%     \end{tabular}
+%     \caption{Experimental results for SAT optimization models. Time in seconds.}
+%     \label{tab:sat_results}
+% \end{table}
+
+\begin{table}[h]
+\centering
+\setlength{\tabcolsep}{3pt} % Riduce lo spazio tra le colonne
+\resizebox{\textwidth}{!}{% Ridimensiona la tabella per stare nei margini
+\begin{tabular}{l*{8}{c}*{8}{c}}
+\toprule
+ & \multicolumn{8}{c}{\textbf{Decisional}} & \multicolumn{8}{c}{\textbf{Optimization}} \\
+\cmidrule(lr){2-9} \cmidrule(lr){10-17}
+\textbf{ID} & \textbf{VP} & \textbf{VH} & \textbf{VS} & \textbf{VT} & \textbf{S} & \textbf{S\_DT} & \textbf{S\_SB} & \textbf{S\_SB\_DT}
+ & \textbf{VP} & \textbf{VH} & \textbf{VS} & \textbf{VT} & \textbf{S} & \textbf{S\_DT} & \textbf{S\_SB} & \textbf{S\_SB\_DT} \\
+\midrule
+12 & 1   & 1   & 0   & 0   & 0   & 0   & 0   & 0
+   & \textbf{2}  & \textbf{1}  & \textbf{0}  & \textbf{1}  & \textbf{1}  & \textbf{1}  & \textbf{1}  & \textbf{1} \\
+14 & 2   & 2   & 0   & 2   & 1   & 1   & 1   & 1
+   & \textbf{3}  & \textbf{3}  & \textbf{4}  & \textbf{3}  & \textbf{5}  & \textbf{2}  & \textbf{4}  & \textbf{2} \\
+16 & 9   & 5   & 4   & 8   & 10  & 10  & 19  & 10
+   & \textbf{9}  & \textbf{17} & \textbf{2}  & \textbf{43} & \textbf{46} & \textbf{5}  & \textbf{68} & \textbf{6} \\
+18 & 26  & 14  & 15  & 29  & 31  & 34  & 1   & 5
+   & \textbf{45} & \textbf{187} & \textbf{73} & \textbf{223} & \textbf{121} & \textbf{23} & N/A                & \textbf{17} \\
+20 & 48  & 272 & 94  & 230 & 73  & 104 & 169 & 42
+   & N/A                 & 300\textbar{}10     & N/A                & N/A                & 300\textbar{}5      & \textbf{161} & N/A                & \textbf{111} \\
+22 & N/A & N/A & N/A & N/A & N/A & 80  & N/A & N/A
+   & N/A                 & N/A                 & N/A                & N/A                & N/A                & 300\textbar{}5      & N/A                & \textbf{195} \\
+\bottomrule
+\end{tabular}
+}
+\caption{Experimental results for SAT decisional and optimization models. Time is reported in seconds. In the optimization columns, bold numbers indicate the time to prove the optimal solution. Entries in the format $Time|Obj$ indicate a timeout where the solver returned the best objective value found within the time limit.}
+\label{tab:sat_results}
+\end{table}
+
+The initial encoding comparisons revealed the unexpected robustness of the \textit{Pairwise} encoding (VP), which outperformed more compact alternatives like Totalizer on instances up to $N=20$, suggesting that their stronger unit propagation outweighs the overhead of the larger formula size. The transition to structural optimizations demonstrated that explicitly encoding the DT invariant is the most effective single factor for optimization, enabling the solver to prove optimality for $N=20$ where the baseline failed. While SB alone incurred performance penalties on some instances, its synergy with DT yielded the best overall performance. A remarkable anomaly appears for $N=22$ with the \textbf{Smart+SB+DT} configuration, where the solver successfully finds the optimal solution but fails to solve the decisional version. This could be explained by the constraining power of the tight objective bound ($\beta=1$) combined with structural pruning that drastically reduces the search space, whereas the unconstrained decisional version leaves the solver navigating a vast and complex landscape without sufficient guidance.
+
+\section{SMT Model}
+% Mandatory for groups of 4. Groups of <=3 choose SAT or SMT (bonus for both)[cite: 68].
+
+\subsection{Overview and Strategy}
+We adopt the same decomposition used throughout the project: the weekly schedule is fixed by the \textit{Circle Method} (Section 1.2), yielding the match-week matrix $W$. The SMT model then solves only the \textit{period assignment} and (optionally) the \textit{home/away} orientation. This separation drastically reduces the search space and enables efficient pseudo-Boolean encodings.
+
+\subsection{Decision variables}
+Consistent with the Common Formalization (Section 1), we use:
+\begin{itemize}
+    \item Period variables $\pi_{ij} \in \mathcal{P}$ for all $i<j$ with $W_{ij}\in\mathcal{W}$; and $\pi_{ii}=0$.
+    \item Home/Away variables $h_{ij} \in \{0,1\}$ for all $i<j$, with reciprocal consistency $h_{ji}=1-h_{ij}$.
+\end{itemize}
+In SMT we encode period selections via guarded pseudo-Boolean literals of the form $[\pi_{ij}=p]$ for $p\in\mathcal{P}$.
+
+\subsection{Constraints}
+The model enforces the same semantic constraints as in CP, using pseudo-Boolean forms:
+\begin{itemize}
+    \item \textbf{Weekly structure:} For every week $w$ and every period $p$, exactly one match of week $w$ is assigned to $p$:
+    $$ \forall w\in\mathcal{W}, \forall p\in\mathcal{P}: \sum_{i<j,\, W_{ij}=w} \mathbb{I}(\pi_{ij}=p) = 1. $$
+    \item \textbf{Period usage (per-team at-most-two):} For every team $t$ and period $p$:
+    $$ \sum_{j\in\mathcal{T},\, j\neq t} \mathbb{I}(\pi_{tj}=p) \le 2. $$
+    \item \textbf{Deficient teams structure (implied):} For every period $p$ exactly two teams appear exactly once, and the remaining $n-2$ appear exactly twice:
+    \begin{align}
+        \sum_{t\in\mathcal{T}} \mathbb{I}\Big( \sum_{j\neq t} \mathbb{I}(\pi_{tj}=p) = 1 \Big) &= 2,\\
+        \sum_{t\in\mathcal{T}} \mathbb{I}\Big( \sum_{j\neq t} \mathbb{I}(\pi_{tj}=p) = 2 \Big) &= n-2.
+    \end{align}
+    \item \textbf{Unique deficiency per team (implied/relaxed):} Each team is deficient in at most one period:
+    $$ \forall t\in\mathcal{T}: \quad \sum_{p\in\mathcal{P}} \mathbb{I}\Big( \sum_{j\neq t} \mathbb{I}(\pi_{tj}=p) = 1 \Big) \le 1. $$
+    \item \textbf{Symmetry breaking (periods):} The periods in week $w=1$ follow a non-decreasing order over the lexicographically ordered matches $\langle \pi_{ij}\mid i<j, W_{ij}=1\rangle$.
+    \item \textbf{Home/Away symmetry:} As in CP, we fix a canonical orientation for the decision version (Section 1), preserving reciprocity $h_{ji}=1-h_{ij}$.
+\end{itemize}
+
+\subsection{Encoding and Solver}
+Cardinality constraints are expressed with pseudo-Boolean operators (Exactly-One and At-Most) over the guards $[\pi_{ij}=p]$. We apply the Z3 tactic \texttt{card2bv} followed by \texttt{smt} to compile cardinalities into efficient bit-vector operations. For optimization we switch to \texttt{Optimize} with a minimization objective.
+
+\subsection{Objective function (optimization version)}
+We minimize the \textit{Total Imbalance} $\beta$ as in Section 1, by counting per-team $H_t$ (home) and $A_t$ (away) occurrences induced by $h_{ij}$ and enforcing $\delta_t \ge |H_t-A_t|$ with standard linearization. We minimize the maximum imbalance via a variable $\textit{total\_imbalance}$ such that $\textit{total\_imbalance}\ge \delta_t$ for all $t$, and then $\min \; \textit{total\_imbalance}$.
+
+\subsection{Validation and Results}
+We evaluate the SMT variants (including \textit{presolve\_2} and the baseline). 
 \begin{center}
-\begin{tabular}{lcccc}\toprule
-Instance & Gecode+SB & Gecode & Chuffed+SB & Chuffed\\\midrule
-4 & 0.01 & 0.01 & 0.01 & 0.01\\
-6 & 0.05 & 0.07 & 0.04 & 0.05\\
-\vdots & & & & \\\bottomrule
+\begin{minipage}{0.48\textwidth}
+\centering
+	\textbf{SMT Decision}
+\begin{tabular}{|l|c|c|c|}
+\hline
+Model & n & Time (s) & Objective \\ 
+\hline
+baseline & 4 & 0 & - \\
+baseline & 6 & 0 & - \\
+baseline & 8 & 0 & - \\
+baseline & 10 & 9 & - \\
+baseline & 12 & 183 & - \\
+baseline & 14 & 300 & - \\
+compact & 4 & 0 & - \\
+compact & 6 & 0 & - \\
+compact & 8 & 0 & - \\
+compact & 10 & 0 & - \\
+compact & 12 & 3 & - \\
+compact & 14 & 4 & - \\
+compact & 16 & 120 & - \\
+presolve & 4 & 0 & - \\
+presolve & 6 & 0 & - \\
+presolve & 8 & 0 & - \\
+presolve & 10 & 0 & - \\
+presolve & 12 & 0 & - \\
+presolve & 14 & 0 & - \\
+presolve & 16 & 1 & - \\
+presolve & 18 & 2 & - \\
+presolve & 20 & 50 & - \\
+presolve & 22 & 300 & - \\
+presolve & 24 & 300 & - \\
+presolve\_2 & 4 & 0 & - \\
+presolve\_2 & 6 & 0 & - \\
+presolve\_2 & 8 & 0 & - \\
+presolve\_2 & 10 & 0 & - \\
+presolve\_2 & 12 & 0 & - \\
+presolve\_2 & 14 & 0 & - \\
+presolve\_2 & 16 & 1 & - \\
+presolve\_2 & 18 & 2 & - \\
+presolve\_2 & 20 & 16 & - \\
+presolve\_2 & 22 & 37 & - \\
+presolve\_2 & 24 & 127 & - \\
+presolve\_2 & 26 & 186 & - \\
+presolve\_2 & 28 & 300 & - \\
+\hline
+\end{tabular}
+\end{minipage}\hfill
+\begin{minipage}{0.48\textwidth}
+\centering
+	\textbf{SMT Optimization}
+\begin{tabular}{|l|c|c|c|}
+\hline
+Model & n & Time (s) & Objective \\ 
+\hline
+presolve & 4 & 0 & - \\
+presolve & 6 & 0 & 1 \\
+presolve & 8 & 0 & 1 \\
+presolve & 10 & 0 & 1 \\
+presolve & 12 & 0 & 1 \\
+presolve & 14 & 1 & 1 \\
+presolve & 16 & 9 & 1 \\
+presolve & 18 & 17 & 1 \\
+presolve & 20 & 176 & 1 \\
+presolve & 22 & 300 & - \\
+presolve\_2 & 4 & 0 & - \\
+presolve\_2 & 6 & 0 & 1 \\
+presolve\_2 & 8 & 0 & 1 \\
+presolve\_2 & 10 & 0 & 1 \\
+presolve\_2 & 12 & 0 & 1 \\
+presolve\_2 & 14 & 1 & 1 \\
+presolve\_2 & 16 & 9 & 1 \\
+presolve\_2 & 18 & 18 & 1 \\
+presolve\_2 & 20 & 300 & - \\
+presolve\_2 & 22 & 300 & - \\
+\hline
+\end{tabular}
+\end{minipage}
+\end{center}
+
+\section{MIP Model}
+% Mandatory for all groups[cite: 82].
+
+\subsection{Overview and Strategy}
+We mirror the project-wide decomposition: the weekly match matrix $W$ is fixed by the \textit{Circle Method} (Section 1.2). The MIP stage assigns periods to those predetermined matches, enforcing the per-team period usage limits and weekly structure. This reduces variable and constraint growth compared to direct MIP that jointly decides pairings and periods.
+
+\subsection{Decision variables}
+For each week $w\in\mathcal{W}$, period $p\in\mathcal{P}$, and match $(i,j)$ such that $W_{ij}=w$ with $i<j$, we introduce binary assignment variables
+$$ x_{w,p,i,j} \in \{0,1\} \quad \text{meaning match } \{i,j\} \text{ in week } w \text{ is scheduled in period } p. $$
+Counts scale as $|x| = (n-1)\cdot |\mathcal{P}|\cdot |M_w| = \frac{n^2(n-1)}{4}$.
+
+\subsection{Constraints}
+All constraints are linear and adhere to the common semantics:
+\begin{itemize}
+    \item \textbf{Match to one period:} For each $(i,j)$ in week $w$,
+    $$ \sum_{p\in\mathcal{P}} x_{w,p,i,j} = 1. $$
+    \item \textbf{Exactly one match per week/period:} For each $w$ and $p$,
+    $$ \sum_{(i,j)\in M_w} x_{w,p,i,j} = 1. $$
+    \item \textbf{Per-team at-most-two per period:} For each team $t$ and period $p$,
+    $$ \sum_{w\in\mathcal{W}} \sum_{\substack{(i,j)\in M_w\\ t\in\{i,j\}}} x_{w,p,i,j} \le 2. $$
+\end{itemize}
+To generate constraints efficiently, we precompute the index set $\text{team\_matches}[t] = \{(w,i,j) \mid (i,j)\in M_w,\ t\in\{i,j\}\}$, yielding $O(n^2)$ model building rather than $O(n^3)$.
+
+\subsection{Objective function (optimization version)}
+We minimize the \textit{Total Imbalance} $\beta$ through standard linearization consistent with Section 1. Let
+\begin{align}
+	ext{home}(t) &= \sum_{w\in\mathcal{W}} \sum_{p\in\mathcal{P}} \sum_{\substack{(i,j)\in M_w\\ i=t}} x_{w,p,i,j}, \\
+	ext{away}(t) &= \sum_{w\in\mathcal{W}} \sum_{p\in\mathcal{P}} \sum_{\substack{(i,j)\in M_w\\ j=t}} x_{w,p,i,j},
+\end{align}
+and introduce $\delta_t \ge |\text{home}(t)-\text{away}(t)|$ via
+\begin{align}
+\delta_t &\ge \text{home}(t) - \text{away}(t), \\
+\delta_t &\ge \text{away}(t) - \text{home}(t).
+\end{align}
+Finally, enforce $\textit{total\_imbalance} \ge \delta_t$ for all $t$ and minimize $\textit{total\_imbalance}$.
+
+\subsection{Validation and Results}
+We compare our presolved MIP against a standard MIP formulation. Backends are OR-Tools compatible; default runs used SCIP with a 300s time limit, single thread.
+
+\begin{center}
+\begin{minipage}{0.48\textwidth}
+\centering
+	\textbf{MIP Decision}
+\begin{tabular}{|l|c|c|c|}
+\hline
+Model & n & Time (s) & Objective \\ 
+\hline
+presolve & 4 & 0 & - \\
+presolve & 6 & 0 & - \\
+presolve & 8 & 0 & - \\
+presolve & 10 & 0 & - \\
+presolve & 12 & 1 & - \\
+presolve & 14 & 4 & - \\
+presolve & 16 & 11 & - \\
+presolve & 18 & 115 & - \\
+presolve & 20 & 41 & - \\
+presolve & 22 & 300 & - \\
+standard & 4 & 0 & - \\
+standard & 6 & 0 & - \\
+standard & 8 & 0 & - \\
+standard & 10 & 0 & - \\
+standard & 12 & 13 & - \\
+standard & 14 & 300 & - \\
+\hline
+\end{tabular}
+\end{minipage}\hfill
+\begin{minipage}{0.48\textwidth}
+\centering
+	\textbf{MIP Optimization}
+\begin{tabular}{|l|c|c|c|}
+\hline
+Model & n & Time (s) & Objective \\ 
+\hline
+presolve & 4 & 0 & - \\
+presolve & 6 & 0 & 1 \\
+presolve & 8 & 0 & 1 \\
+presolve & 10 & 0 & 1 \\
+presolve & 12 & 2 & 1 \\
+presolve & 14 & 31 & 1 \\
+presolve & 16 & 300 & 1 \\
+presolve & 18 & 300 & - \\
+standard & 4 & 0 & - \\
+\hline
+\end{tabular}
+\end{minipage}
+\end{center}
+
+\paragraph{Comparison with direct MIP.}
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+$n$ & Direct MIP & Presolve MIP & Speedup \\
+\hline
+12 & 45 s & 1 s & 45$\times$ \\
+14 & 280 s & 3 s & 93$\times$ \\
+16 & timeout & 15 s & $>$20$\times$ \\
+18 & timeout & 45 s & $>$6$\times$ \\
+\hline
 \end{tabular}
 \end{center}
 
-% =============================================================
-\section{SAT Model}
-\subsection{Decision Variables}
-Boolean literals $x_{i,j,w,p}$ (true iff oriented match $(i\text{ home},j\text{ away})$ is scheduled at $(w,p)$) and $o_{i,j}$ for orientation if factored. Domains: \{$0,1$\}.
-\subsection{Objective Function}
-Aggregate deviation $\Dsum$ encoded via cardinality constraints or successive SAT solves with bound tightening; or minimax imbalance by binary search on $I$ and additional clauses enforcing $|H_i-A_i|\le I$.
-\subsection{Constraints}
-Clauses enforce: (i) exactly one week-period per unordered pair (pair expansion); (ii) per-week exactly one occurrence per team (at-most-one with pairwise or sequential encoding plus at-least-one); (iii) slot uniqueness (exactly-one over all pairs oriented); (iv) period cap (at-most-two per team per period across weeks). Implied and symmetry breaking as in Section 2 using unit clauses fixing reference assignments.
-\subsection{Validation}
-Backend: Z3 (mandatory). Instances and limits as in CP section. Record runtime / best objective. Provide comparison table analogous to Section 2.
+These results show that fixing $W$ and only assigning periods yields large speedups, smaller models, and near-optimal balance in the optimization variant.
 
-% =============================================================
-\section{SMT Model}
-\subsection{Decision Variables}
-Integer variables $p_{i,j}\in\{1,\dots,\Periods\}$ for period, fixed week from preprocessing, and optional Boolean $h_{i,j}$ for orientation. Additional $d_i$ and $I$ for minimax objective.
-\subsection{Objective Function}
-Minimize $I$ with constraints $d_i\ge H_i-A_i$, $d_i\ge A_i-H_i$, $I\ge d_i$.
-\subsection{Constraints}
-Cardinality constraints enforce exactly-one per period slot in each week; at-most-two period appearances aggregated via pseudo-Boolean inequalities; first-week symmetry broken by fixed period ordering.
-\subsection{Validation}
-Backends: Z3 or CVC5. Same instance set; measure time and objective; reproduce tables.
-
-% =============================================================
-\section{MIP Model}
-\subsection{Decision Variables}
-Binary $x_{i,j,w,p}$, $i\neq j$, for oriented placement; or reduced forms using preassigned weeks and only periods/orientation (presolve variant).
-\subsection{Objective Function}
-Either $\min \sum_i d_i$ with linearization $d_i\ge H_i-A_i$, $d_i\ge A_i-H_i$; or minimax via $I\ge d_i$ and $\min I$.
-\subsection{Constraints}
-Linear equalities and inequalities for pair uniqueness, weekly participation, slot occupancy, and period cap. Symmetry breaking: fix selected slots (e.g. match $(1,2)$ at $(1,1)$) and impose ordering on early periods for team 1.
-\subsection{Validation}
-Backends: CBC, SCIP, others (optional). Record feasibility, objective, runtime. Provide comparative table analogous to CP.
-
-% =============================================================
 \section{Conclusions}
-We formalized a unified family of models sharing identical structural constraints and two fairness objectives; differences lie in variable encodings and constraint propagation strengths. Results guide backend selection under instance size and objective preferences.
+% Brief concluding remarks[cite: 95].
 
-\section*{Authenticity and Author Contribution Statement (Excluded)}
-All work is original; any external ideas properly cited. AI assistance, where used, will be disclosed per section. Contributions: (placeholder summary for each author).
+\section*{Authenticity and Author Contribution Statement}
+% Declare work is your own. Cite ideas taken from others[cite: 97, 98].
+% AI usage must be disclosed and referenced[cite: 99, 100].
+% Describe each author's contribution[cite: 101].
 
-\section*{References (Excluded)}
-% Replace with a bibliography environment or BibTeX.
-\begin{itemize}\item Placeholder reference list.\end{itemize}
+\begin{thebibliography}{9}
+% List references here[cite: 103].
+\bibitem{wiki:roundrobin}
+Wikipedia contributors, \textit{Round-robin tournament}, Wikipedia, The Free Encyclopedia. Available at: \url{https://en.wikipedia.org/wiki/Round-robin_tournament} [Accessed: 15  June 2025].
+\bibitem{hamiez2004}
+J.-P. Hamiez and J.-K. Hao, ``Using solution properties within an enumerative search to solve a sports league scheduling problem,'' \textit{Discrete Applied Mathematics}, vol. 156, pp. 1683--1693, 2008.
+\end{thebibliography}
 
 \end{document}
