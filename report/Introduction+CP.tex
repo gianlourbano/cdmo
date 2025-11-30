@@ -433,41 +433,86 @@ Cardinality constraints are expressed with pseudo-Boolean operators (Exactly-One
 We minimize the \textit{Total Imbalance} $\beta$ as in Section 1, by counting per-team $H_t$ (home) and $A_t$ (away) occurrences induced by $h_{ij}$ and enforcing $\delta_t \ge |H_t-A_t|$ with standard linearization. We minimize the maximum imbalance via a variable $\textit{total\_imbalance}$ such that $\textit{total\_imbalance}\ge \delta_t$ for all $t$, and then $\min \; \textit{total\_imbalance}$.
 
 \subsection{Validation and Results}
-We evaluate two SMT variants: the presolved model described above (\textit{Presolve\_2}) and a standard baseline (file \texttt{sts\_solver/smt/baseline\_class.py}). We report decision results (feasibility) and optimization results (objective $\beta$). Raw outputs are available under \texttt{res/SMT}.
-
-\paragraph{Decision version.}
+We evaluate the SMT variants (including \textit{presolve\_2} and the baseline). 
 \begin{center}
-\begin{tabular}{|c|c|c|c|}
+\begin{minipage}{0.48\textwidth}
+\centering
+	\textbf{SMT Decision}
+\begin{tabular}{|l|c|c|c|}
 \hline
-$n$ & Direct SMT & Presolve (baseline) & Presolve\_2 \\
+Model & n & Time (s) & Objective \\ 
 \hline
-12 & 30s & $<1$ s & $<1$ s \\
-18 & timeout & 1 s & $<1$ s \\
-20 & timeout & $<100$ s & $<10$ s \\
-24 & timeout & timeout & $<60$ s \\
+baseline & 4 & 0 & - \\
+baseline & 6 & 0 & - \\
+baseline & 8 & 0 & - \\
+baseline & 10 & 9 & - \\
+baseline & 12 & 183 & - \\
+baseline & 14 & 300 & - \\
+compact & 4 & 0 & - \\
+compact & 6 & 0 & - \\
+compact & 8 & 0 & - \\
+compact & 10 & 0 & - \\
+compact & 12 & 3 & - \\
+compact & 14 & 4 & - \\
+compact & 16 & 120 & - \\
+presolve & 4 & 0 & - \\
+presolve & 6 & 0 & - \\
+presolve & 8 & 0 & - \\
+presolve & 10 & 0 & - \\
+presolve & 12 & 0 & - \\
+presolve & 14 & 0 & - \\
+presolve & 16 & 1 & - \\
+presolve & 18 & 2 & - \\
+presolve & 20 & 50 & - \\
+presolve & 22 & 300 & - \\
+presolve & 24 & 300 & - \\
+presolve\_2 & 4 & 0 & - \\
+presolve\_2 & 6 & 0 & - \\
+presolve\_2 & 8 & 0 & - \\
+presolve\_2 & 10 & 0 & - \\
+presolve\_2 & 12 & 0 & - \\
+presolve\_2 & 14 & 0 & - \\
+presolve\_2 & 16 & 1 & - \\
+presolve\_2 & 18 & 2 & - \\
+presolve\_2 & 20 & 16 & - \\
+presolve\_2 & 22 & 37 & - \\
+presolve\_2 & 24 & 127 & - \\
+presolve\_2 & 26 & 186 & - \\
+presolve\_2 & 28 & 300 & - \\
 \hline
 \end{tabular}
-\end{center}
-
-\paragraph{Optimization version.}
-\begin{center}
-\begin{tabular}{|c|c|c|}
+\end{minipage}\hfill
+\begin{minipage}{0.48\textwidth}
+\centering
+	\textbf{SMT Optimization}
+\begin{tabular}{|l|c|c|c|}
 \hline
-$n$ & Time (s) & Objective ($\max_t \, \delta_t$) \\
+Model & n & Time (s) & Objective \\ 
 \hline
-6 & $<1$ & 0 \\
-8 & $<1$ & 1 \\
-10 & $<1$ & 1 \\
-12 & 2 & 1 \\
-14 & 5 & 1 \\
-16 & 15 & 1 \\
-18 & 45 & 1 \\
-20 & 120 & 1 \\
+presolve & 4 & 0 & - \\
+presolve & 6 & 0 & 1 \\
+presolve & 8 & 0 & 1 \\
+presolve & 10 & 0 & 1 \\
+presolve & 12 & 0 & 1 \\
+presolve & 14 & 1 & 1 \\
+presolve & 16 & 9 & 1 \\
+presolve & 18 & 17 & 1 \\
+presolve & 20 & 176 & 1 \\
+presolve & 22 & 300 & - \\
+presolve\_2 & 4 & 0 & - \\
+presolve\_2 & 6 & 0 & 1 \\
+presolve\_2 & 8 & 0 & 1 \\
+presolve\_2 & 10 & 0 & 1 \\
+presolve\_2 & 12 & 0 & 1 \\
+presolve\_2 & 14 & 1 & 1 \\
+presolve\_2 & 16 & 9 & 1 \\
+presolve\_2 & 18 & 18 & 1 \\
+presolve\_2 & 20 & 300 & - \\
+presolve\_2 & 22 & 300 & - \\
 \hline
 \end{tabular}
+\end{minipage}
 \end{center}
-
-These results confirm that the presolving strategy with pseudo-Boolean encoding and \texttt{card2bv} yields substantial improvements over direct SMT and the baseline model, achieving near-theoretical optimal balance ($\beta\le 1$) for all tested instances.
 
 \section{MIP Model}
 % Mandatory for all groups[cite: 82].
@@ -506,56 +551,54 @@ and introduce $\delta_t \ge |\text{home}(t)-\text{away}(t)|$ via
 Finally, enforce $\textit{total\_imbalance} \ge \delta_t$ for all $t$ and minimize $\textit{total\_imbalance}$.
 
 \subsection{Validation and Results}
-We compare our presolved MIP against a standard MIP formulation (file \texttt{sts\_solver/mip/standard.py}). Backends are OR-Tools compatible; default runs used SCIP with a 300s time limit, single thread. Raw outputs are available under \texttt{res/MIP}.
+We compare our presolved MIP against a standard MIP formulation. Backends are OR-Tools compatible; default runs used SCIP with a 300s time limit, single thread.
 
-\paragraph{Problem size (example $n=16$).}
 \begin{center}
-\begin{tabular}{|l|c|c|}
+\begin{minipage}{0.48\textwidth}
+\centering
+	\textbf{MIP Decision}
+\begin{tabular}{|l|c|c|c|}
 \hline
-	extbf{Component} & \textbf{Formula} & \textbf{Value} \\
+Model & n & Time (s) & Objective \\ 
 \hline
-Binary Variables & $\tfrac{n^2(n-1)}{4}$ & 960 \\
-Match Assignment & $\tfrac{n(n-1)}{2}$ & 120 \\
-Period Slot & $\tfrac{n(n-1)}{2}$ & 120 \\
-Team Period & $\tfrac{n^2}{2}$ & 128 \\
-\hline
-	extbf{Total Constraints} & $n(n-1)+\tfrac{n^2}{2}$ & 368 \\
+presolve & 4 & 0 & - \\
+presolve & 6 & 0 & - \\
+presolve & 8 & 0 & - \\
+presolve & 10 & 0 & - \\
+presolve & 12 & 1 & - \\
+presolve & 14 & 4 & - \\
+presolve & 16 & 11 & - \\
+presolve & 18 & 115 & - \\
+presolve & 20 & 41 & - \\
+presolve & 22 & 300 & - \\
+standard & 4 & 0 & - \\
+standard & 6 & 0 & - \\
+standard & 8 & 0 & - \\
+standard & 10 & 0 & - \\
+standard & 12 & 13 & - \\
+standard & 14 & 300 & - \\
 \hline
 \end{tabular}
-\end{center}
-
-\paragraph{Empirical results (decision).}
-\begin{center}
-\begin{tabular}{|c|c|c|}
+\end{minipage}\hfill
+\begin{minipage}{0.48\textwidth}
+\centering
+	\textbf{MIP Optimization}
+\begin{tabular}{|l|c|c|c|}
 \hline
-$n$ & Time (SCIP) & Status \\
+Model & n & Time (s) & Objective \\ 
 \hline
-6 & $<1$ s & FEAS \\
-8 & $<1$ s & FEAS \\
-10 & $<1$ s & FEAS \\
-12 & 1 s & FEAS \\
-14 & 3 s & FEAS \\
-16 & 15 s & FEAS \\
-18 & 45 s & FEAS \\
-20 & 180 s & FEAS \\
-\hline
-\end{tabular}
-\end{center}
-
-\paragraph{Empirical results (optimization).}
-\begin{center}
-\begin{tabular}{|c|c|c|}
-\hline
-$n$ & Time (SCIP) & Objective ($\max_t\,\delta_t$) \\
-\hline
-6 & $<1$ s & 1 \\
-8 & $<1$ s & 1 \\
-10 & 1 s & 1 \\
-12 & 3 s & 1 \\
-14 & 8 s & 1 \\
-16 & 35 s & 1 \\
+presolve & 4 & 0 & - \\
+presolve & 6 & 0 & 1 \\
+presolve & 8 & 0 & 1 \\
+presolve & 10 & 0 & 1 \\
+presolve & 12 & 2 & 1 \\
+presolve & 14 & 31 & 1 \\
+presolve & 16 & 300 & 1 \\
+presolve & 18 & 300 & - \\
+standard & 4 & 0 & - \\
 \hline
 \end{tabular}
+\end{minipage}
 \end{center}
 
 \paragraph{Comparison with direct MIP.}
